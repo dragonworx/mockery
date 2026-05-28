@@ -34,8 +34,13 @@
 
   // ── Matching ──────────────────────────────────────────────────────────
   function findMatch(url) {
+    console.log('[HTTP Mocker] DEBUG: findMatch called with:', url);
+    console.log('[HTTP Mocker] DEBUG: enabled:', enabled, 'rules count:', rules.length);
+
     if (!enabled || rules.length === 0) return null;
+
     for (const rule of rules) {
+      console.log('[HTTP Mocker] DEBUG: Testing rule:', rule);
       try {
         if (rule.isRegex) {
           if (new RegExp(rule.pattern).test(url)) return rule;
@@ -87,10 +92,16 @@
 
   window.fetch = async function (input, init) {
     const url = (typeof input === 'string') ? input : (input instanceof Request ? input.url : String(input));
+    console.log('[HTTP Mocker] DEBUG: Fetch called for:', url);
+
     const rule = findMatch(url);
+    console.log('[HTTP Mocker] DEBUG: Rule found:', rule);
 
     if (rule) {
+      console.log('[HTTP Mocker] DEBUG: Requesting mock for:', url);
       const mock = await requestMock(url);
+      console.log('[HTTP Mocker] DEBUG: Mock response:', mock);
+
       if (mock) {
         let parsed;
         try { parsed = JSON.parse(mock.body); } catch { parsed = mock.body; }
@@ -99,7 +110,22 @@
         console.log('mime', mock.mime);
         console.log('body', parsed);
         console.groupEnd();
-        return new Response(mock.body, {
+
+        // Handle binary data for fetch responses
+        let responseBody;
+        if (mock.isBinary) {
+          // Convert base64 back to binary for fetch Response
+          const binaryString = atob(mock.body);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          responseBody = bytes;
+        } else {
+          responseBody = mock.body;
+        }
+
+        return new Response(responseBody, {
           status: 200,
           statusText: 'OK (mocked)',
           headers: { 'Content-Type': mock.mime },
@@ -146,12 +172,44 @@
       console.log('body', parsed);
       console.groupEnd();
 
+      // Handle different response types for XMLHttpRequest
+      let responseText = mock.body;
+      let response = mock.body;
+
+      if (mock.isBinary) {
+        // For binary data, set up response based on responseType
+        const responseType = xhr.responseType || 'text';
+
+        if (responseType === 'arraybuffer') {
+          const binaryString = atob(mock.body);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          response = bytes.buffer;
+          responseText = ''; // Can't convert binary to text
+        } else if (responseType === 'blob') {
+          const binaryString = atob(mock.body);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          response = new Blob([bytes], { type: mock.mime });
+          responseText = ''; // Can't convert binary to text
+        } else {
+          // For 'text', 'document', or default - keep as base64 string
+          // This isn't ideal but maintains backward compatibility
+          response = mock.body;
+          responseText = mock.body;
+        }
+      }
+
       // Synthesise a completed XHR
       Object.defineProperty(xhr, 'readyState', { get: () => 4 });
       Object.defineProperty(xhr, 'status', { get: () => 200 });
       Object.defineProperty(xhr, 'statusText', { get: () => 'OK (mocked)' });
-      Object.defineProperty(xhr, 'responseText', { get: () => mock.body });
-      Object.defineProperty(xhr, 'response', { get: () => mock.body });
+      Object.defineProperty(xhr, 'responseText', { get: () => responseText });
+      Object.defineProperty(xhr, 'response', { get: () => response });
       Object.defineProperty(xhr, 'responseURL', { get: () => url });
       Object.defineProperty(xhr, 'getResponseHeader', {
         value: (name) => {

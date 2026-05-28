@@ -34,29 +34,11 @@
     <div class="rules-section">
       <div class="rules-header">
         <h2>Rules (<span id="ruleCount">0</span>)</h2>
-        <button type="button" id="refreshBtn" class="btn btn-small btn-clear">Refresh</button>
+        <button type="button" id="refreshBtn" class="btn btn-small btn-clear">Refresh Rules</button>
       </div>
       <div id="rulesList" class="rules-list">
         <div class="empty-state">Connect to the mock server to see rules.</div>
       </div>
-
-      <!-- Add rule form -->
-      <form id="addRuleForm" class="add-rule-form">
-        <div class="add-rule-row">
-          <input type="text" id="patternInput" placeholder="URL pattern" required>
-          <label class="regex-toggle" title="Treat pattern as regex">
-            <input type="checkbox" id="regexCheck"> regex
-          </label>
-        </div>
-        <div class="add-rule-row file-row">
-          <label id="filePickerLabel" class="file-picker-label">
-            <span id="filePickerText">Choose file…</span>
-            <input type="file" id="fileUpload" class="hidden">
-          </label>
-          <button type="submit" class="btn btn-small btn-primary">Add</button>
-        </div>
-        <small id="uploadStatus" class="upload-status hidden"></small>
-      </form>
     </div>
 
     <!-- Recent Activity -->
@@ -76,12 +58,12 @@
         <summary>Setup Guide</summary>
         <ol>
           <li>Start the server: <code>npm start</code> or <code>node mock-server.js</code></li>
-          <li>Add rules via this UI:
+          <li>Manage mocks via the file system:
             <ul>
-              <li>Enter a URL pattern to match</li>
-              <li>Option A: Click "Choose file..." to select a file from your computer. The extension will automatically read and save it to the mocks folder.</li>
-              <li>Option B: Enter a file path (relative paths like <code>mocks/data.json</code> or absolute paths work)</li>
-              <li><strong>New:</strong> No need for absolute paths anymore! Selected files are read directly and saved to <code>mocks/</code> with unique names</li>
+              <li>Add mock files to the <code>mocks/</code> folder</li>
+              <li>Create folders to organize your mocks</li>
+              <li>Edit <code>.mocks.json</code> to add URL patterns and file paths</li>
+              <li>Example: <code>{"pattern": "api/users", "file": "mocks/users.json"}</code></li>
             </ul>
           </li>
           <li>Toggle the extension on — matched requests will serve your files</li>

@@ -13,12 +13,6 @@ const refreshBtn = document.getElementById('refreshBtn');
 const ruleCount = document.getElementById('ruleCount');
 const rulesList = document.getElementById('rulesList');
 const activityList = document.getElementById('activityList');
-const addRuleForm = document.getElementById('addRuleForm');
-const patternInput = document.getElementById('patternInput');
-const fileUpload = document.getElementById('fileUpload');
-const filePickerText = document.getElementById('filePickerText');
-const uploadStatus = document.getElementById('uploadStatus');
-const regexCheck = document.getElementById('regexCheck');
 const clearActivityBtn = document.getElementById('clearActivityBtn');
 
 const DEFAULT_SERVER = 'http://localhost:8756';
@@ -34,8 +28,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   enableToggle.addEventListener('change', handleToggle);
   connectBtn.addEventListener('click', handleConnect);
   refreshBtn.addEventListener('click', fetchRules);
-  addRuleForm.addEventListener('submit', handleAddRule);
-  fileUpload.addEventListener('change', handleFileSelected);
   clearActivityBtn.addEventListener('click', handleClearActivity);
 
   await checkServer();
@@ -98,6 +90,9 @@ async function fetchRules() {
     if (!resp.ok) throw new Error(resp.statusText);
     const rules = await resp.json();
     renderRules(rules);
+
+    // Also refresh declarativeNetRequest rules
+    chrome.runtime.sendMessage({ type: 'REFRESH_DECLARATIVE_RULES' });
   } catch (err) {
     rulesList.innerHTML = '<div class="empty-state">Failed to load rules.</div>';
     ruleCount.textContent = '0';
@@ -126,133 +121,9 @@ function renderRules(rules) {
           <span class="rule-badge ${badge}">${badge}</span>
         </div>
       </div>
-      <button class="btn btn-small btn-delete" data-pattern="${escapeHtml(rule.pattern)}" title="Delete rule">✕</button>
     `;
-    div.querySelector('.btn-delete').addEventListener('click', () => handleDeleteRule(rule.pattern));
     rulesList.appendChild(div);
   });
-}
-
-// ── Add rule ─────────────────────────────────────────────────────────────────
-async function handleFileSelected() {
-  const file = fileUpload.files[0];
-  if (!file) return;
-
-  filePickerText.textContent = file.name;
-
-  // With the new approach using File API, we can read the file content directly
-  uploadStatus.textContent = `Selected: ${file.name} — Ready to upload! Just click "Add" to save it to the mocks folder.`;
-  uploadStatus.className = 'upload-status';
-  uploadStatus.style.color = '#28a745';
-}
-
-async function handleAddRule(e) {
-  try {
-    e.preventDefault();
-    const pattern = patternInput.value.trim();
-    const isRegex = regexCheck.checked;
-    const selectedFile = fileUpload.files[0];
-
-    if (!pattern) {
-      showNotification('Please enter a URL pattern', 'error');
-      return;
-    }
-
-    // Check if we need a file
-    if (!selectedFile) {
-      showNotification('Please select a file', 'error');
-      return;
-    }
-
-    if (isRegex) {
-      try { new RegExp(pattern); }
-      catch { showNotification('Invalid regex pattern', 'error'); return; }
-    }
-
-    const base = await serverBase();
-
-    try {
-      // Read file content and save to mocks folder
-      uploadStatus.textContent = 'Reading and saving file to mocks folder...';
-      uploadStatus.style.color = '#ff6b35';
-
-      // Read file content using File API
-      const fileContent = await readFileContent(selectedFile);
-
-      // Save file content to mocks folder
-      const saveResp = await fetch(`${base}/save-file`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileContent: fileContent,
-          fileName: selectedFile.name
-        }),
-      });
-
-      const saveData = await saveResp.json();
-      if (!saveResp.ok) throw new Error(saveData.error);
-
-      // Use the relative path from the save operation
-      const filePath = saveData.filePath;
-
-      uploadStatus.textContent = `File saved to ${saveData.filePath}`;
-      uploadStatus.style.color = '#28a745';
-
-      // Add the rule with the file path
-      const resp = await fetch(`${base}/rules`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pattern, file: filePath, isRegex }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error);
-
-      // Clear form
-      patternInput.value = '';
-      fileUpload.value = '';
-      filePickerText.textContent = 'Choose file…';
-      uploadStatus.className = 'upload-status hidden';
-      regexCheck.checked = false;
-
-      renderRules(data.rules);
-      showNotification('Rule added', 'success');
-    } catch (err) {
-      uploadStatus.textContent = '';
-      showError(`Failed: ${err.message}`, err);
-    }
-  } catch (err) {
-    // Catch any unexpected errors (like null reference errors)
-    uploadStatus.textContent = '';
-    showError(`Unexpected error: ${err.message}`, err);
-  }
-}
-
-// Helper function to read file content using File API
-function readFileContent(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = (e) => reject(new Error(`Failed to read file: ${e.target.error}`));
-    reader.readAsText(file);
-  });
-}
-
-// ── Delete rule ───────────────────────────────────────────────────────────────
-async function handleDeleteRule(pattern) {
-  const base = await serverBase();
-  try {
-    const resp = await fetch(`${base}/rules`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pattern }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error);
-    renderRules(data.rules);
-    showNotification('Rule deleted', 'success');
-  } catch (err) {
-    showError(`Failed: ${err.message}`, err);
-  }
 }
 
 // ── Activity ─────────────────────────────────────────────────────────────────

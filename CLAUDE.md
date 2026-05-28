@@ -31,38 +31,30 @@ npm run kill
 3. Click refresh icon on the extension
 4. Reload test pages to see changes
 
+**Refreshing Rules:**
+- Edit `.mocks.json` or add/modify files in `mocks/` folder
+- Click "Refresh Rules" in the extension popup to update both JavaScript and declarativeNetRequest rules
+- Or restart the server to automatically refresh rules on next page load
+
 ## Architecture
 
 ### Request Interception Flow
 
-The extension uses a three-layer architecture to intercept requests:
+The extension uses a **hybrid architecture** that intercepts different types of requests through different mechanisms:
 
-1. **MAIN-world Script** (`mock-injector.js`)
-   - Injected into page's JavaScript context using `world: "MAIN"`
-   - Patches `window.fetch()` and `XMLHttpRequest.prototype` directly
-   - Prevents requests from hitting the network
-   - Communicates with ISOLATED world via `window.postMessage()`
+1. **JavaScript Requests** (fetch/XMLHttpRequest)
+   - **MAIN-world Script** (`mock-injector.js`) - patches `window.fetch()` and `XMLHttpRequest.prototype`
+   - **ISOLATED-world Bridge** (`content-bridge.js`) - bridges to background service worker
+   - **Background Service Worker** (`background.js`) - fetches from Node server
 
-2. **ISOLATED-world Bridge** (`content-bridge.js`)
-   - Standard content script with Chrome API access
-   - Bridges between MAIN world and background service worker
-   - Fetches rules from Node server and pushes them to MAIN world
-   - Shows toast notifications for intercepted requests
+2. **HTML Resource Requests** (img tags, CSS, script tags)
+   - **declarativeNetRequest API** - intercepts at network layer
+   - **Dynamic Rule Generation** - converts .mocks.json to Chrome rules
+   - **Redirect to Server** - routes to same Node.js companion server
 
-3. **Background Service Worker** (`background.js`)
-   - Receives `RESOLVE_MOCK` messages from bridge
-   - Fetches mock data from Node server (localhost:8756)
-   - Returns mock body and MIME type to bridge
-   - Tracks recent activity in `chrome.storage.local`
+### Message Flow Examples
 
-4. **Node.js Companion Server** (`mock-server.js`)
-   - Zero-dependency HTTP server
-   - Serves mock files based on URL pattern matching
-   - Hot-reloads `.mocks.json` configuration
-   - Provides RESTful API for rule management
-
-### Message Flow for Request Interception
-
+**JavaScript Request:**
 ```
 fetch("https://api.example.com/users")
   → mock-injector.js (MAIN world) checks rules
@@ -73,26 +65,47 @@ fetch("https://api.example.com/users")
   → synthesized Response object returned to page
 ```
 
-### Why This Architecture?
+**HTML Resource Request:**
+```
+<img src="https://example.com/logo.svg">
+  → declarativeNetRequest rule matches pattern
+  → redirects to http://localhost:8756/resolve?url=https://example.com/logo.svg
+  → Node server returns mock file content
+  → browser displays mock content
+```
 
-- **MAIN world injection** is required because Chrome extensions cannot intercept `fetch()`/`XMLHttpRequest` from ISOLATED world
-- **ISOLATED world bridge** is required because MAIN world cannot access Chrome APIs (`chrome.runtime`, `chrome.storage`)
-- **Background service worker** is required to fetch from localhost without CORS issues
+### Why This Hybrid Architecture?
+
+- **MAIN world injection** handles dynamic JavaScript requests that can't be intercepted by declarativeNetRequest
+- **declarativeNetRequest** handles HTML resources (img, css, script tags) that can't be intercepted by JavaScript patches
+- **ISOLATED world bridge** provides Chrome API access from MAIN world
+- **Background service worker** enables localhost communication without CORS
+- **Node server** provides file-based mock management and MIME detection
 - **Node server** is required because Chrome extensions cannot read arbitrary local files
 
-## Configuration File
+## Configuration Management
+
+### Manual File System Approach
+
+Rules are managed through direct file system manipulation:
+
+1. **Create mock files** in the `mocks/` folder (or subfolders)
+2. **Edit `.mocks.json`** by hand to add URL patterns and file paths
+3. **Server hot-reloads** configuration when `.mocks.json` changes
+
+### Configuration File
 
 `.mocks.json` format (in project root):
 ```json
 [
   {
     "pattern": "https://api.example.com/users",
-    "file": "./mocks/users.json",
+    "file": "mocks/users.json",
     "isRegex": false
   },
   {
     "pattern": ".*\\.example\\.com.*address-book.*",
-    "file": "./mocks/address-book.json",
+    "file": "mocks/api/address-book.json",
     "isRegex": true
   }
 ]
@@ -105,6 +118,21 @@ Relative paths in rules are resolved in this order:
 2. Relative to project root (cwd)
 3. If in `mocks/` folder, resolves to `{cwd}/mocks/{filename}`
 
+### Folder Organization
+
+The `mocks/` folder can be organized however you prefer:
+```
+mocks/
+├── api/
+│   ├── users.json
+│   └── auth/
+│       └── login.json
+├── static/
+│   ├── images/
+│   └── styles/
+└── data.json
+```
+
 ## Key Implementation Details
 
 ### Pattern Matching
@@ -112,14 +140,10 @@ Relative paths in rules are resolved in this order:
 - Regex patterns: tested with `new RegExp(pattern).test(url)`
 - Bad regex patterns are silently skipped
 
-### File Upload Feature
-- Files uploaded via popup are saved to `mocks/{basename}_{timestamp}{ext}`
-- Uses timestamp to avoid filename conflicts
-- Returns relative path (e.g., `mocks/test_1234567890.json`) for use in rules
-- Creates `mocks/` directory if it doesn't exist
-
 ### MIME Type Detection
-Mock server auto-detects content-type:
+Mock server auto-detects content-type for a wide range of file types:
+
+**Text/Document Formats:**
 - `.json` → `application/json`
 - `.html`, `.htm` → `text/html`
 - `.xml` → `application/xml`
@@ -127,7 +151,45 @@ Mock server auto-detects content-type:
 - `.css` → `text/css`
 - `.csv` → `text/csv`
 - `.txt` → `text/plain`
+- `.pdf` → `application/pdf`
+- `.doc` → `application/msword`
+- `.docx` → `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+- `.xls` → `application/vnd.ms-excel`
+- `.xlsx` → `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+
+**Image Formats:**
+- `.png` → `image/png`
+- `.jpg`, `.jpeg` → `image/jpeg`
+- `.gif` → `image/gif`
+- `.webp` → `image/webp`
 - `.svg` → `image/svg+xml`
+- `.ico` → `image/x-icon`
+- `.bmp` → `image/bmp`
+- `.tiff`, `.tif` → `image/tiff`
+
+**Audio/Video:**
+- `.mp3` → `audio/mpeg`
+- `.mp4` → `video/mp4`
+- `.wav` → `audio/wav`
+- `.avi` → `video/x-msvideo`
+
+**Fonts:**
+- `.woff` → `font/woff`
+- `.woff2` → `font/woff2`
+- `.ttf` → `font/ttf`
+- `.otf` → `font/otf`
+
+**Archives:**
+- `.zip` → `application/zip`
+- `.tar` → `application/x-tar`
+- `.gz` → `application/gzip`
+
+**Binary Data Handling:**
+The extension properly handles binary files (images, PDFs, fonts, archives) by:
+- Converting binary data to base64 during transport
+- Reconstructing proper binary responses in the browser
+- Supporting different XMLHttpRequest responseTypes (`arraybuffer`, `blob`)
+- Maintaining correct Content-Type headers
 
 ### Toast Notifications
 - Success: green toast showing URL → file mapping
@@ -139,12 +201,8 @@ Mock server auto-detects content-type:
 ## Server API Endpoints
 
 - `GET /health` — Server status and rule count
-- `GET /rules` — List all rules
-- `POST /rules` — Add a new rule (`{pattern, file, isRegex}`)
-- `DELETE /rules` — Remove rule by pattern (`{pattern}`)
-- `POST /save-file` — Save file to mocks folder (`{fileName, fileContent}`)
+- `GET /rules` — List all rules from .mocks.json
 - `GET /resolve?url=<encoded>` — Resolve mock for URL (used by extension)
-- `GET /pwd` — Get current working directory and mocks path
 
 ## Important Notes
 
@@ -174,9 +232,9 @@ Mock server auto-detects content-type:
 ├── background.js          # Background service worker
 ├── content-bridge.js      # ISOLATED-world bridge script
 ├── mock-injector.js       # MAIN-world request interceptor
-├── popup.html/js/css      # Extension popup UI
+├── popup.html/js/css      # Extension popup UI (simplified, read-only)
 ├── mock-server.js         # Node.js companion server
-├── .mocks.json           # Server configuration (rules)
+├── .mocks.json           # Server configuration (edit by hand)
 ├── package.json          # Node.js package config
-└── mocks/               # Mock response files
+└── mocks/               # Mock response files (organize as needed)
 ```

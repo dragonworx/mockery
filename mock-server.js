@@ -76,6 +76,38 @@ function guessMime(filePath) {
     '.csv': 'text/csv',
     '.txt': 'text/plain',
     '.svg': 'image/svg+xml',
+    // Image formats
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.ico': 'image/x-icon',
+    '.bmp': 'image/bmp',
+    '.tiff': 'image/tiff',
+    '.tif': 'image/tiff',
+    // Document formats
+    '.pdf': 'application/pdf',
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.xls': 'application/vnd.ms-excel',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    // Audio/Video
+    '.mp3': 'audio/mpeg',
+    '.mp4': 'video/mp4',
+    '.wav': 'audio/wav',
+    '.avi': 'video/x-msvideo',
+    // Archives
+    '.zip': 'application/zip',
+    '.tar': 'application/x-tar',
+    '.gz': 'application/gzip',
+    // Fonts
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.ttf': 'font/ttf',
+    '.otf': 'font/otf',
+    // Other
+    '.bin': 'application/octet-stream',
   };
   return map[ext] || 'application/octet-stream';
 }
@@ -159,6 +191,52 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── GET /resolve-pattern?pattern=<encoded> ─────────────────────────────
+  // Alternative endpoint for declarativeNetRequest that can't pass original URL
+  if (parsed.pathname === '/resolve-pattern') {
+    const pattern = parsed.searchParams.get('pattern');
+    if (!pattern) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing ?pattern= parameter' }));
+      return;
+    }
+
+    // Find the rule by pattern
+    const rule = rules.find(r => r.pattern === pattern);
+    if (!rule) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'No matching rule for pattern', pattern }));
+      return;
+    }
+
+    // Resolve file path (same logic as /resolve endpoint)
+    let filePath;
+    if (path.isAbsolute(rule.file)) {
+      filePath = rule.file;
+    } else {
+      // Try relative to config file location first
+      const configDir = path.dirname(path.resolve(configPath));
+      const configRelative = path.join(configDir, rule.file);
+      if (fs.existsSync(configRelative)) {
+        filePath = configRelative;
+      } else {
+        // Fall back to relative to current working directory
+        filePath = path.resolve(rule.file);
+      }
+    }
+
+    try {
+      const data = fs.readFileSync(filePath);
+      const mime = guessMime(filePath);
+      res.writeHead(200, { 'Content-Type': mime });
+      res.end(data);
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'File read error', file: rule.file, details: err.message }));
+    }
+    return;
+  }
+
   // ── GET /rules — return current rule list ─────────────────────────────
   if (parsed.pathname === '/rules' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -173,120 +251,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ── POST /rules — add a rule ──────────────────────────────────────────
-  if (parsed.pathname === '/rules' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      try {
-        const rule = JSON.parse(body);
-        if (!rule.pattern || !rule.file) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'pattern and file are required' }));
-          return;
-        }
-
-        // Allow both absolute and relative paths (relative paths are in mocks folder)
-        // No validation needed - we handle both cases in the resolve logic
-        rules.push({ pattern: rule.pattern, file: rule.file, isRegex: !!rule.isRegex });
-        const snapshot = [...rules];
-        fs.writeFileSync(configPath, JSON.stringify(snapshot, null, 2));
-        console.log(`[mock-server] Rule added: ${rule.pattern} → ${rule.file}`);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, rules: snapshot }));
-      } catch (err) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      }
-    });
-    return;
-  }
-
-  // ── DELETE /rules — remove a rule by pattern ──────────────────────────
-  if (parsed.pathname === '/rules' && req.method === 'DELETE') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      try {
-        const { pattern } = JSON.parse(body);
-        const before = rules.length;
-        rules = rules.filter(r => r.pattern !== pattern);
-        const snapshot = [...rules];
-        fs.writeFileSync(configPath, JSON.stringify(snapshot, null, 2));
-        console.log(`[mock-server] Rule removed: ${pattern} (${before - snapshot.length} removed)`);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, rules: snapshot }));
-      } catch (err) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      }
-    });
-    return;
-  }
-
-  // ── POST /save-file — save file content to mocks folder ──────────────────────────
-  if (parsed.pathname === '/save-file' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      try {
-        const { fileContent, fileName } = JSON.parse(body);
-        if (!fileContent || !fileName) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'fileContent and fileName are required' }));
-          return;
-        }
-
-        // Create mocks directory if it doesn't exist
-        const mocksDir = path.join(process.cwd(), 'mocks');
-        if (!fs.existsSync(mocksDir)) {
-          fs.mkdirSync(mocksDir, { recursive: true });
-        }
-
-        // Generate unique filename to avoid conflicts
-        const timestamp = Date.now();
-        const ext = path.extname(fileName);
-        const baseName = path.basename(fileName, ext);
-        const uniqueFileName = `${baseName}_${timestamp}${ext}`;
-        const destPath = path.join(mocksDir, uniqueFileName);
-        const relativePath = path.join('mocks', uniqueFileName);
-
-        // Save the file content
-        fs.writeFile(destPath, fileContent, 'utf8', (err) => {
-          if (err) {
-            console.error(`[mock-server] File save error: ${destPath}`, err.message);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'File save error', detail: err.message }));
-            return;
-          }
-
-          console.log(`[mock-server] File saved: ${relativePath}`);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({
-            ok: true,
-            filePath: relativePath,
-            originalName: fileName,
-            uniqueName: uniqueFileName
-          }));
-        });
-      } catch (err) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      }
-    });
-    return;
-  }
-
-  // ── GET /pwd — return current working directory ─────────────────────────
-  if (parsed.pathname === '/pwd' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      cwd: process.cwd(),
-      mocksDir: path.join(process.cwd(), 'mocks')
-    }));
-    return;
-  }
-
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Not found' }));
 });
@@ -295,11 +259,8 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`[mock-server] Listening on http://localhost:${port}`);
   console.log(`[mock-server] Config: ${configPath}`);
   console.log(`[mock-server] Endpoints:`);
-  console.log(`  GET /resolve?url=<encoded>   — serve a matched mock`);
-  console.log(`  GET /rules                   — list current rules`);
-  console.log(`  POST /rules                  — add a rule`);
-  console.log(`  DELETE /rules                — remove a rule`);
-  console.log(`  POST /save-file              — save file content to mocks folder`);
+  console.log(`  GET /resolve?url=<encoded>       — serve a matched mock`);
+  console.log(`  GET /resolve-pattern?pattern=<>  — serve mock by pattern (for declarativeNetRequest)`);
+  console.log(`  GET /rules                       — list current rules from .mocks.json`);
   console.log(`  GET /health                  — server status`);
-  console.log(`  GET /pwd                     — get project directory`);
 });
