@@ -17,9 +17,9 @@ const addRuleForm = document.getElementById('addRuleForm');
 const patternInput = document.getElementById('patternInput');
 const fileUpload = document.getElementById('fileUpload');
 const filePickerText = document.getElementById('filePickerText');
-const filePathInput = document.getElementById('filePathInput');
 const uploadStatus = document.getElementById('uploadStatus');
 const regexCheck = document.getElementById('regexCheck');
+const clearActivityBtn = document.getElementById('clearActivityBtn');
 
 const DEFAULT_SERVER = 'http://localhost:8756';
 
@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   refreshBtn.addEventListener('click', fetchRules);
   addRuleForm.addEventListener('submit', handleAddRule);
   fileUpload.addEventListener('change', handleFileSelected);
+  clearActivityBtn.addEventListener('click', handleClearActivity);
 
   await checkServer();
   await loadActivity();
@@ -143,15 +144,6 @@ async function handleFileSelected() {
   uploadStatus.textContent = `Selected: ${file.name} — Ready to upload! Just click "Add" to save it to the mocks folder.`;
   uploadStatus.className = 'upload-status';
   uploadStatus.style.color = '#28a745';
-
-  // Hide the file path input since we don't need it for file uploads anymore
-  filePathInput.style.display = 'none';
-
-  // Hide the path hint as well
-  const pathHint = filePathInput.nextElementSibling;
-  if (pathHint && pathHint.classList.contains('path-hint')) {
-    pathHint.style.display = 'none';
-  }
 }
 
 async function handleAddRule(e) {
@@ -166,10 +158,9 @@ async function handleAddRule(e) {
       return;
     }
 
-    // Check if we need a file (either file selected or path provided)
-    const manualPath = filePathInput.value.trim();
-    if (!selectedFile && !manualPath) {
-      showNotification('Please select a file or enter a file path', 'error');
+    // Check if we need a file
+    if (!selectedFile) {
+      showNotification('Please select a file', 'error');
       return;
     }
 
@@ -179,36 +170,33 @@ async function handleAddRule(e) {
     }
 
     const base = await serverBase();
-    let filePath = manualPath; // Default to manual path if provided
 
     try {
-      // If a file was selected, read its content and save to mocks folder
-      if (selectedFile) {
-        uploadStatus.textContent = 'Reading and saving file to mocks folder...';
-        uploadStatus.style.color = '#ff6b35';
+      // Read file content and save to mocks folder
+      uploadStatus.textContent = 'Reading and saving file to mocks folder...';
+      uploadStatus.style.color = '#ff6b35';
 
-        // Read file content using File API
-        const fileContent = await readFileContent(selectedFile);
+      // Read file content using File API
+      const fileContent = await readFileContent(selectedFile);
 
-        // Save file content to mocks folder
-        const saveResp = await fetch(`${base}/save-file`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileContent: fileContent,
-            fileName: selectedFile.name
-          }),
-        });
+      // Save file content to mocks folder
+      const saveResp = await fetch(`${base}/save-file`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileContent: fileContent,
+          fileName: selectedFile.name
+        }),
+      });
 
-        const saveData = await saveResp.json();
-        if (!saveResp.ok) throw new Error(saveData.error);
+      const saveData = await saveResp.json();
+      if (!saveResp.ok) throw new Error(saveData.error);
 
-        // Use the relative path from the save operation
-        filePath = saveData.filePath;
+      // Use the relative path from the save operation
+      const filePath = saveData.filePath;
 
-        uploadStatus.textContent = `File saved to ${saveData.filePath}`;
-        uploadStatus.style.color = '#28a745';
-      }
+      uploadStatus.textContent = `File saved to ${saveData.filePath}`;
+      uploadStatus.style.color = '#28a745';
 
       // Add the rule with the file path
       const resp = await fetch(`${base}/rules`, {
@@ -221,20 +209,10 @@ async function handleAddRule(e) {
 
       // Clear form
       patternInput.value = '';
-      filePathInput.value = '';
       fileUpload.value = '';
       filePickerText.textContent = 'Choose file…';
       uploadStatus.className = 'upload-status hidden';
       regexCheck.checked = false;
-
-      // Show the file path input again for next use
-      filePathInput.style.display = 'block';
-
-      // Show the path hint as well
-      const pathHint = filePathInput.nextElementSibling;
-      if (pathHint && pathHint.classList.contains('path-hint')) {
-        pathHint.style.display = 'block';
-      }
 
       renderRules(data.rules);
       showNotification('Rule added', 'success');
@@ -281,6 +259,12 @@ async function handleDeleteRule(pattern) {
 async function loadActivity() {
   const { recentActivity = [] } = await chrome.storage.local.get('recentActivity');
   renderActivity(recentActivity);
+}
+
+async function handleClearActivity() {
+  await chrome.storage.local.set({ recentActivity: [] });
+  renderActivity([]);
+  showNotification('Activity cleared', 'success');
 }
 
 function renderActivity(items) {

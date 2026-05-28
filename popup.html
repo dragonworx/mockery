@@ -55,17 +55,16 @@
           </label>
           <button type="submit" class="btn btn-small btn-primary">Add</button>
         </div>
-        <div class="add-rule-row">
-          <input type="text" id="filePathInput" placeholder="Or enter a file path (relative like 'mocks/data.json' or absolute paths)">
-          <small class="path-hint">📁 You can choose a file above OR manually enter a file path here. Files are automatically saved to mocks folder.</small>
-        </div>
         <small id="uploadStatus" class="upload-status hidden"></small>
       </form>
     </div>
 
     <!-- Recent Activity -->
     <div class="activity-section">
-      <h2>Recent Activity</h2>
+      <div class="activity-header">
+        <h2>Recent Activity</h2>
+        <button type="button" id="clearActivityBtn" class="btn btn-small btn-clear">Clear</button>
+      </div>
       <div id="activityList" class="activity-list">
         <div class="empty-activity">No recent activity</div>
       </div>
