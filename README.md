@@ -131,20 +131,18 @@ http-request-mocker/
 │   ├── icon16.png
 │   ├── icon48.png
 │   └── icon128.png
-├── mocks/           # Example mock files
+├── .mocks/          # Example mock files
 │   ├── address-book.json
 │   ├── users-list.json
 │   ├── auth-login.json
 │   └── error-404.json
-└── stubs/          # Server mock files (auto-created)
-    └── test.json
 ```
 
 ## Usage Examples
 
 ### Example 1: Banking API Mock
 
-**Mock File (`stubs/address-book.json`):**
+**Mock File (`.mocks/address-book.json`):**
 ```json
 {
   "addressBook": [
@@ -162,14 +160,14 @@ http-request-mocker/
 ```json
 {
   "pattern": ".*commbank.com.au.*address-book.*json.*",
-  "file": "./stubs/address-book.json",
+  "file": "address-book.json",
   "isRegex": true
 }
 ```
 
 ### Example 2: User Authentication
 
-**Mock File (`stubs/login-success.json`):**
+**Mock File (`.mocks/login-success.json`):**
 ```json
 {
   "success": true,
@@ -185,14 +183,14 @@ http-request-mocker/
 ```json
 {
   "pattern": "https://api.myapp.com/auth/login",
-  "file": "./stubs/login-success.json",
+  "file": "login-success.json",
   "isRegex": false
 }
 ```
 
 ### Example 3: API Error Simulation
 
-**Mock File (`stubs/404-error.json`):**
+**Mock File (`.mocks/404-error.json`):**
 ```json
 {
   "error": {
@@ -200,6 +198,15 @@ http-request-mocker/
     "message": "User not found",
     "details": "The requested user ID does not exist"
   }
+}
+```
+
+**Rule Configuration:**
+```json
+{
+  "pattern": "api/users/999",
+  "file": "404-error.json",
+  "isRegex": false
 }
 ```
 

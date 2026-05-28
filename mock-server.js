@@ -10,9 +10,15 @@
  *
  * Config format (.mocks.json):
  *   [
- *     { "pattern": "https://api.example.com/users", "file": "./stubs/users.json" },
- *     { "pattern": "address-book\\.smtnbnxt\\.json", "file": "./stubs/address-book.json", "isRegex": true }
+ *     { "pattern": "https://api.example.com/users", "file": "users.json" },
+ *     { "pattern": "address-book\\.smtnbnxt\\.json", "file": "icon.svg", "isRegex": true }
  *   ]
+ *
+ * File paths:
+ *   - Relative paths without directory separators default to .mocks/ folder
+ *   - "users.json" resolves to ".mocks/users.json"
+ *   - "data/users.json" stays as "data/users.json" (explicit path)
+ *   - Absolute paths are used as-is
  */
 
 const http = require('http');
@@ -160,18 +166,25 @@ const server = http.createServer((req, res) => {
     }
 
     // Resolve file path - handle both absolute and relative paths
-    // Relative paths are resolved from project root, with mocks folder as fallback
+    // Relative paths default to .mocks/ folder unless they contain a directory separator
     let filePath;
     if (path.isAbsolute(rule.file)) {
       filePath = rule.file;
     } else {
-      // Try relative to project root first
-      const relativeFromRoot = path.resolve(path.dirname(configPath), rule.file);
-      if (fs.existsSync(relativeFromRoot)) {
-        filePath = relativeFromRoot;
+      // If the path doesn't contain a directory separator, default to .mocks/ folder
+      let resolvedFile = rule.file;
+      if (!rule.file.includes('/') && !rule.file.includes('\\')) {
+        resolvedFile = path.join('.mocks', rule.file);
+      }
+
+      // Try relative to config file directory first
+      const configDir = path.dirname(path.resolve(configPath));
+      const configRelative = path.join(configDir, resolvedFile);
+      if (fs.existsSync(configRelative)) {
+        filePath = configRelative;
       } else {
-        // Fallback to resolving relative to project root (handles mocks/ paths)
-        filePath = path.resolve(process.cwd(), rule.file);
+        // Fall back to relative to current working directory
+        filePath = path.resolve(resolvedFile);
       }
     }
 
@@ -209,19 +222,26 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    // Resolve file path (same logic as /resolve endpoint)
+    // Resolve file path - handle both absolute and relative paths
+    // Relative paths default to .mocks/ folder unless they contain a directory separator
     let filePath;
     if (path.isAbsolute(rule.file)) {
       filePath = rule.file;
     } else {
-      // Try relative to config file location first
+      // If the path doesn't contain a directory separator, default to .mocks/ folder
+      let resolvedFile = rule.file;
+      if (!rule.file.includes('/') && !rule.file.includes('\\')) {
+        resolvedFile = path.join('.mocks', rule.file);
+      }
+
+      // Try relative to config file directory first
       const configDir = path.dirname(path.resolve(configPath));
-      const configRelative = path.join(configDir, rule.file);
+      const configRelative = path.join(configDir, resolvedFile);
       if (fs.existsSync(configRelative)) {
         filePath = configRelative;
       } else {
         // Fall back to relative to current working directory
-        filePath = path.resolve(rule.file);
+        filePath = path.resolve(resolvedFile);
       }
     }
 

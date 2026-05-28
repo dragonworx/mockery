@@ -32,7 +32,7 @@ npm run kill
 4. Reload test pages to see changes
 
 **Refreshing Rules:**
-- Edit `.mocks.json` or add/modify files in `mocks/` folder
+- Edit `.mocks.json` or add/modify files in `.mocks/` folder
 - Click "Refresh Rules" in the extension popup to update both JavaScript and declarativeNetRequest rules
 - Or restart the server to automatically refresh rules on next page load
 
@@ -89,7 +89,7 @@ fetch("https://api.example.com/users")
 
 Rules are managed through direct file system manipulation:
 
-1. **Create mock files** in the `mocks/` folder (or subfolders)
+1. **Create mock files** in the `.mocks/` folder (or subfolders)
 2. **Edit `.mocks.json`** by hand to add URL patterns and file paths
 3. **Server hot-reloads** configuration when `.mocks.json` changes
 
@@ -100,12 +100,12 @@ Rules are managed through direct file system manipulation:
 [
   {
     "pattern": "https://api.example.com/users",
-    "file": "mocks/users.json",
+    "file": "users.json",
     "isRegex": false
   },
   {
     "pattern": ".*\\.example\\.com.*address-book.*",
-    "file": "mocks/api/address-book.json",
+    "file": "api/address-book.json",
     "isRegex": true
   }
 ]
@@ -113,24 +113,25 @@ Rules are managed through direct file system manipulation:
 
 ### File Path Resolution
 
-Relative paths in rules are resolved in this order:
-1. Relative to `.mocks.json` location
-2. Relative to project root (cwd)
-3. If in `mocks/` folder, resolves to `{cwd}/mocks/{filename}`
+Relative paths in rules are resolved as follows:
+- Simple filenames (e.g. `"users.json"`) automatically resolve to `.mocks/users.json`
+- Paths with directories (e.g. `"api/users.json"`) resolve to `.mocks/api/users.json`
+- Paths starting with `./` or `../` are resolved relative to `.mocks.json` location
+- Absolute paths are used as-is
 
 ### Folder Organization
 
-The `mocks/` folder can be organized however you prefer:
+The `.mocks/` folder can be organized however you prefer:
 ```
-mocks/
+.mocks/
 ├── api/
 │   ├── users.json
 │   └── auth/
-│       └── login.json
-├── static/
-│   ├── images/
-│   └── styles/
-└── data.json
+│       └── token.json
+├── images/
+│   ├── logo.svg
+│   └── avatar.png
+└── data.csv
 ```
 
 ## Key Implementation Details
@@ -236,5 +237,5 @@ The extension properly handles binary files (images, PDFs, fonts, archives) by:
 ├── mock-server.js         # Node.js companion server
 ├── .mocks.json           # Server configuration (edit by hand)
 ├── package.json          # Node.js package config
-└── mocks/               # Mock response files (organize as needed)
+└── .mocks/              # Mock response files (organize as needed)
 ```

@@ -1,12 +1,12 @@
 [
   {
     "pattern": "CBAlogo.svg",
-    "file": "mocks/icon.svg",
+    "file": "icon.svg",
     "isRegex": false
   },
   {
     "pattern": "https://www.stg.commbank.com.au/content/netbank/tracking/dhp/retail/netbank/core/banking/payments/payment-settings/address-book.smtnbnxt.json",
-    "file": "mocks/aem/test.json",
+    "file": "aem/test.json",
     "isRegex": false
   }
 ]
