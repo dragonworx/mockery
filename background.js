@@ -111,7 +111,7 @@ async function updateDeclarativeRules() {
       addRules: declarativeRules
     });
 
-    console.log(`[HTTP Mocker] Updated ${declarativeRules.length} declarativeNetRequest rules`);
+    console.log(`[HTTP Mocker] Updated declarativeNetRequest rules: ${declarativeRules.length} active`);
 
   } catch (err) {
     console.error('[HTTP Mocker] Error updating declarativeNetRequest rules:', err);

@@ -15,6 +15,8 @@
   const CHANNEL = '__HTTP_MOCKER__';
   let enabled = true;
   let rules = [];
+  let showNotifications = true;
+  let enableLogging = true;
 
   // ── Rule cache — pushed from the ISOLATED world ───────────────────────
   window.addEventListener('message', (event) => {
@@ -26,6 +28,8 @@
     if (msg.type === 'RULES_UPDATE') {
       rules = msg.rules || [];
       enabled = msg.enabled;
+      showNotifications = msg.showNotifications !== false; // Default to true
+      enableLogging = msg.enableLogging !== false;       // Default to true
     }
   });
 
@@ -34,13 +38,9 @@
 
   // ── Matching ──────────────────────────────────────────────────────────
   function findMatch(url) {
-    console.log('[HTTP Mocker] DEBUG: findMatch called with:', url);
-    console.log('[HTTP Mocker] DEBUG: enabled:', enabled, 'rules count:', rules.length);
-
     if (!enabled || rules.length === 0) return null;
 
     for (const rule of rules) {
-      console.log('[HTTP Mocker] DEBUG: Testing rule:', rule);
       try {
         if (rule.isRegex) {
           if (new RegExp(rule.pattern).test(url)) return rule;
@@ -92,24 +92,22 @@
 
   window.fetch = async function (input, init) {
     const url = (typeof input === 'string') ? input : (input instanceof Request ? input.url : String(input));
-    console.log('[HTTP Mocker] DEBUG: Fetch called for:', url);
 
     const rule = findMatch(url);
-    console.log('[HTTP Mocker] DEBUG: Rule found:', rule);
 
     if (rule) {
-      console.log('[HTTP Mocker] DEBUG: Requesting mock for:', url);
       const mock = await requestMock(url);
-      console.log('[HTTP Mocker] DEBUG: Mock response:', mock);
 
       if (mock) {
-        let parsed;
-        try { parsed = JSON.parse(mock.body); } catch { parsed = mock.body; }
-        console.groupCollapsed(`[HTTP Mocker] fetch → ${rule.file}`);
-        console.log('url ', url);
-        console.log('mime', mock.mime);
-        console.log('body', parsed);
-        console.groupEnd();
+        if (enableLogging) {
+          let parsed;
+          try { parsed = JSON.parse(mock.body); } catch { parsed = mock.body; }
+          console.groupCollapsed(`[HTTP Mocker] fetch → ${rule.file}`);
+          console.log('url ', url);
+          console.log('mime', mock.mime);
+          console.log('body', parsed);
+          console.groupEnd();
+        }
 
         // Handle binary data for fetch responses
         let responseBody;
@@ -166,11 +164,13 @@
 
       let parsed;
       try { parsed = JSON.parse(mock.body); } catch { parsed = mock.body; }
-      console.groupCollapsed(`[HTTP Mocker] XHR → ${rule.file}`);
-      console.log('url ', url);
-      console.log('mime', mock.mime);
-      console.log('body', parsed);
-      console.groupEnd();
+      if (enableLogging) {
+        console.groupCollapsed(`[HTTP Mocker] XHR → ${rule.file}`);
+        console.log('url ', url);
+        console.log('mime', mock.mime);
+        console.log('body', parsed);
+        console.groupEnd();
+      }
 
       // Handle different response types for XMLHttpRequest
       let responseText = mock.body;
@@ -233,5 +233,5 @@
     });
   };
 
-  console.log('[HTTP Mocker] MAIN-world injector loaded');
+  console.log('[HTTP Mocker] Injector ready');
 })();

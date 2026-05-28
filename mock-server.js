@@ -184,7 +184,7 @@ const server = http.createServer((req, res) => {
       }
 
       const mime = guessMime(filePath);
-      console.log(`[mock-server] ✓ ${targetUrl}  →  ${rule.file} (${mime})`);
+      console.log(`[mock-server] ${targetUrl} → ${rule.file}`);
       res.writeHead(200, { 'Content-Type': mime });
       res.end(data);
     });
@@ -228,6 +228,7 @@ const server = http.createServer((req, res) => {
     try {
       const data = fs.readFileSync(filePath);
       const mime = guessMime(filePath);
+      console.log(`[mock-server] ${pattern} → ${rule.file}`);
       res.writeHead(200, { 'Content-Type': mime });
       res.end(data);
     } catch (err) {

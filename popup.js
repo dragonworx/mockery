@@ -14,21 +14,31 @@ const ruleCount = document.getElementById('ruleCount');
 const rulesList = document.getElementById('rulesList');
 const activityList = document.getElementById('activityList');
 const clearActivityBtn = document.getElementById('clearActivityBtn');
+const notifyToggle = document.getElementById('notifyToggle');
+const logToggle = document.getElementById('logToggle');
 
 const DEFAULT_SERVER = 'http://localhost:8756';
 
 // ── Init ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  const { enabled, serverUrl } = await chrome.storage.local.get(['enabled', 'serverUrl']);
+  const { enabled, serverUrl, showNotifications, enableLogging } = await chrome.storage.local.get([
+    'enabled', 'serverUrl', 'showNotifications', 'enableLogging'
+  ]);
 
   enableToggle.checked = enabled !== false;
   updateStatusText(enabled !== false);
   serverUrlInput.value = serverUrl || DEFAULT_SERVER;
 
+  // Load settings with defaults
+  notifyToggle.checked = showNotifications !== false; // Default to true
+  logToggle.checked = enableLogging !== false;       // Default to true
+
   enableToggle.addEventListener('change', handleToggle);
   connectBtn.addEventListener('click', handleConnect);
   refreshBtn.addEventListener('click', fetchRules);
   clearActivityBtn.addEventListener('click', handleClearActivity);
+  notifyToggle.addEventListener('change', handleNotifyToggle);
+  logToggle.addEventListener('change', handleLogToggle);
 
   await checkServer();
   await loadActivity();
@@ -45,6 +55,17 @@ async function handleToggle() {
 function updateStatusText(enabled) {
   statusText.textContent = enabled ? 'Enabled' : 'Disabled';
   statusText.className = `status-text ${enabled ? 'enabled' : 'disabled'}`;
+}
+
+// ── Settings ────────────────────────────────────────────────────────────────
+async function handleNotifyToggle() {
+  const showNotifications = notifyToggle.checked;
+  await chrome.storage.local.set({ showNotifications });
+}
+
+async function handleLogToggle() {
+  const enableLogging = logToggle.checked;
+  await chrome.storage.local.set({ enableLogging });
 }
 
 // ── Server connection ────────────────────────────────────────────────────────

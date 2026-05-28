@@ -14,7 +14,9 @@ const CHANNEL = '__HTTP_MOCKER__';
 // ── Push rules into MAIN world ──────────────────────────────────────────────
 
 async function pushRules() {
-  const { enabled, serverUrl } = await chrome.storage.local.get(['enabled', 'serverUrl']);
+  const { enabled, serverUrl, showNotifications, enableLogging } = await chrome.storage.local.get([
+    'enabled', 'serverUrl', 'showNotifications', 'enableLogging'
+  ]);
   const base = serverUrl || 'http://localhost:8756';
   let rules = [];
 
@@ -32,13 +34,15 @@ async function pushRules() {
     type: 'RULES_UPDATE',
     rules,
     enabled: enabled !== false,
+    showNotifications: showNotifications !== false, // Default to true
+    enableLogging: enableLogging !== false,       // Default to true
   }, '*');
 }
 
 // Initial push + refresh on storage changes
 pushRules();
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && (changes.enabled || changes.serverUrl)) {
+  if (area === 'local' && (changes.enabled || changes.serverUrl || changes.showNotifications || changes.enableLogging)) {
     pushRules();
   }
 });
