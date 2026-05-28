@@ -1,12 +1,7 @@
 [
   {
-    "pattern": "debug-rule",
-    "file": "./stubs/debug.json",
-    "isRegex": false
-  },
-  {
     "pattern": "https://www.stg.commbank.com.au/content/netbank/tracking/dhp/retail/netbank/core/banking/payments/payment-settings/address-book.smtnbnxt.json",
-    "file": "./stubs/test.json",
+    "file": "./mocks/test.json",
     "isRegex": false
   }
 ]

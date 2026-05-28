@@ -127,7 +127,13 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    const filePath = path.resolve(path.dirname(configPath), rule.file);
+    // Resolve file path - handle both absolute and relative paths
+    let filePath;
+    if (path.isAbsolute(rule.file)) {
+      filePath = rule.file;
+    } else {
+      filePath = path.resolve(path.dirname(configPath), rule.file);
+    }
 
     fs.readFile(filePath, (err, data) => {
       if (err) {
@@ -156,42 +162,6 @@ const server = http.createServer((req, res) => {
   if (parsed.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, rules: rules.length }));
-    return;
-  }
-
-  // ── POST /upload — save a file to stubs/ and return its relative path ────
-  if (parsed.pathname === '/upload' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      try {
-        const { filename, content } = JSON.parse(body);
-        if (!filename || content === undefined) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'filename and content are required' }));
-          return;
-        }
-
-        // Sanitise filename — strip path separators to prevent directory traversal
-        const safeName = path.basename(filename);
-        const stubsDir = path.join(path.dirname(configPath), 'stubs');
-
-        if (!fs.existsSync(stubsDir)) {
-          fs.mkdirSync(stubsDir, { recursive: true });
-        }
-
-        const dest = path.join(stubsDir, safeName);
-        fs.writeFileSync(dest, content, 'utf-8');
-
-        const relativePath = `./stubs/${safeName}`;
-        console.log(`[mock-server] Uploaded: ${safeName} → ${dest}`);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, file: relativePath }));
-      } catch (err) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      }
-    });
     return;
   }
 
@@ -253,5 +223,7 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`[mock-server] Endpoints:`);
   console.log(`  GET /resolve?url=<encoded>   — serve a matched mock`);
   console.log(`  GET /rules                   — list current rules`);
+  console.log(`  POST /rules                  — add a rule`);
+  console.log(`  DELETE /rules                — remove a rule`);
   console.log(`  GET /health                  — server status`);
 });

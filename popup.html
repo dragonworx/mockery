@@ -51,9 +51,12 @@
         <div class="add-rule-row file-row">
           <label id="filePickerLabel" class="file-picker-label">
             <span id="filePickerText">Choose file…</span>
-            <input type="file" id="fileUpload" class="hidden" required>
+            <input type="file" id="fileUpload" class="hidden">
           </label>
           <button type="submit" class="btn btn-small btn-primary">Add</button>
+        </div>
+        <div class="add-rule-row">
+          <input type="text" id="filePathInput" placeholder="File path (e.g., ./mocks/users.json)" required>
         </div>
         <small id="uploadStatus" class="upload-status hidden"></small>
       </form>
@@ -77,14 +80,15 @@
             <pre>[
   {
     "pattern": "address-book\\.json",
-    "file": "./stubs/address-book.json",
+    "file": "./mocks/address-book.json",
     "isRegex": true
   }
 ]</pre>
           </li>
           <li>Start the server: <code>node mock-server.js</code></li>
+          <li>Add rules via the extension UI or edit <code>.mocks.json</code> directly</li>
           <li>Toggle the extension on — matched requests will serve your local files</li>
-          <li>Edit stub files in place — changes are picked up on next request</li>
+          <li>Edit mock files in place — changes are picked up on next request</li>
         </ol>
       </details>
     </div>

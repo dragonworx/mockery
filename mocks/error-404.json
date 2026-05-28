@@ -1,9 +1,0 @@
-{
-  "status": "error",
-  "error": {
-    "code": 404,
-    "message": "Resource not found",
-    "details": "The requested resource does not exist",
-    "timestamp": "2024-01-15T10:30:00Z"
-  }
-}

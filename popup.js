@@ -17,10 +17,9 @@ const addRuleForm = document.getElementById('addRuleForm');
 const patternInput = document.getElementById('patternInput');
 const fileUpload = document.getElementById('fileUpload');
 const filePickerText = document.getElementById('filePickerText');
+const filePathInput = document.getElementById('filePathInput');
 const uploadStatus = document.getElementById('uploadStatus');
 const regexCheck = document.getElementById('regexCheck');
-
-let pendingFilePath = null; // path returned by server after upload
 
 const DEFAULT_SERVER = 'http://localhost:8756';
 
@@ -139,37 +138,32 @@ async function handleFileSelected() {
   if (!file) return;
 
   filePickerText.textContent = file.name;
-  uploadStatus.textContent = 'Uploading…';
-  uploadStatus.className = 'upload-status';
 
-  const content = await file.text();
-  const base = await serverBase();
-
-  try {
-    const resp = await fetch(`${base}/upload`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename: file.name, content }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error);
-    pendingFilePath = data.file;
-    uploadStatus.textContent = `Saved to ${data.file}`;
-    uploadStatus.style.color = '#28a745';
-  } catch (err) {
-    pendingFilePath = null;
-    uploadStatus.textContent = `Upload failed: ${err.message}`;
-    uploadStatus.style.color = '#dc3545';
+  // Auto-suggest a path based on the filename
+  const suggestedPath = `./mocks/${file.name}`;
+  if (!filePathInput.value || filePathInput.value === '') {
+    filePathInput.value = suggestedPath;
   }
+
+  uploadStatus.textContent = `Selected: ${file.name}`;
+  uploadStatus.className = 'upload-status';
+  uploadStatus.style.color = '#28a745';
 }
 
 async function handleAddRule(e) {
   e.preventDefault();
   const pattern = patternInput.value.trim();
+  const filePath = filePathInput.value.trim();
   const isRegex = regexCheck.checked;
 
-  if (!pattern) return;
-  if (!pendingFilePath) { showNotification('Choose a file first', 'error'); return; }
+  if (!pattern) {
+    showNotification('Please enter a URL pattern', 'error');
+    return;
+  }
+  if (!filePath) {
+    showNotification('Please specify a file path', 'error');
+    return;
+  }
 
   if (isRegex) {
     try { new RegExp(pattern); }
@@ -181,16 +175,19 @@ async function handleAddRule(e) {
     const resp = await fetch(`${base}/rules`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pattern, file: pendingFilePath, isRegex }),
+      body: JSON.stringify({ pattern, file: filePath, isRegex }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error);
+
+    // Clear form
     patternInput.value = '';
+    filePathInput.value = '';
     fileUpload.value = '';
     filePickerText.textContent = 'Choose file…';
     uploadStatus.className = 'upload-status hidden';
     regexCheck.checked = false;
-    pendingFilePath = null;
+
     renderRules(data.rules);
     showNotification('Rule added', 'success');
   } catch (err) {
