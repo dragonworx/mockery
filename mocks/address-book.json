@@ -1,0 +1,43 @@
+{
+  "success": true,
+  "data": {
+    "addressBook": {
+      "contacts": [
+        {
+          "id": "1",
+          "name": "John Smith",
+          "accountNumber": "1234567890",
+          "bsb": "062-000",
+          "bank": "Commonwealth Bank",
+          "nickname": "John's Savings",
+          "type": "domestic"
+        },
+        {
+          "id": "2",
+          "name": "Jane Doe",
+          "accountNumber": "9876543210",
+          "bsb": "062-001",
+          "bank": "Commonwealth Bank",
+          "nickname": "Jane's Transaction",
+          "type": "domestic"
+        },
+        {
+          "id": "3",
+          "name": "ACME Corporation",
+          "accountNumber": "5555555555",
+          "bsb": "062-002",
+          "bank": "Commonwealth Bank",
+          "nickname": "Business Account",
+          "type": "business"
+        }
+      ],
+      "totalCount": 3,
+      "lastUpdated": "2024-01-15T10:30:00Z"
+    }
+  },
+  "metadata": {
+    "timestamp": "2024-01-15T10:30:00Z",
+    "version": "1.0",
+    "mockData": true
+  }
+}

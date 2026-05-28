@@ -1,0 +1,22 @@
+{
+  "name": "http-request-mocker",
+  "version": "1.0.0",
+  "description": "Chrome extension to intercept HTTP requests and serve stubbed responses",
+  "main": "mock-server.js",
+  "scripts": {
+    "start": "node mock-server.js"
+  },
+  "keywords": [
+    "chrome-extension",
+    "mock",
+    "http",
+    "requests",
+    "testing",
+    "stub"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=12.0.0"
+  }
+}

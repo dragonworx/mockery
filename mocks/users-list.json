@@ -1,0 +1,44 @@
+{
+  "success": true,
+  "data": {
+    "users": [
+      {
+        "id": 1,
+        "username": "alice.johnson",
+        "email": "alice@example.com",
+        "firstName": "Alice",
+        "lastName": "Johnson",
+        "role": "admin",
+        "status": "active",
+        "avatar": "https://i.pravatar.cc/150?img=1"
+      },
+      {
+        "id": 2,
+        "username": "bob.smith",
+        "email": "bob@example.com",
+        "firstName": "Bob",
+        "lastName": "Smith",
+        "role": "user",
+        "status": "active",
+        "avatar": "https://i.pravatar.cc/150?img=2"
+      },
+      {
+        "id": 3,
+        "username": "charlie.brown",
+        "email": "charlie@example.com",
+        "firstName": "Charlie",
+        "lastName": "Brown",
+        "role": "user",
+        "status": "inactive",
+        "avatar": "https://i.pravatar.cc/150?img=3"
+      }
+    ],
+    "pagination": {
+      "total": 3,
+      "page": 1,
+      "pageSize": 10,
+      "totalPages": 1
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}

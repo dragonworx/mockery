@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTTP Request Mocker</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>HTTP Request Mocker</h1>
+      <div class="toggle-container">
+        <label class="toggle">
+          <input type="checkbox" id="enableToggle">
+          <span class="toggle-slider"></span>
+        </label>
+        <span id="statusText" class="status-text">Disabled</span>
+      </div>
+    </div>
+
+    <!-- Server Connection -->
+    <div class="server-section">
+      <div class="server-row">
+        <span id="serverStatus" class="status-dot offline" title="Disconnected"></span>
+        <input type="text" id="serverUrl" placeholder="http://localhost:8765" spellcheck="false">
+        <button type="button" id="connectBtn" class="btn btn-small btn-primary">Connect</button>
+      </div>
+      <small id="serverHint" class="server-hint">Start server: <code>node mock-server.js</code></small>
+    </div>
+
+    <!-- Rules from server -->
+    <div class="rules-section">
+      <div class="rules-header">
+        <h2>Rules (<span id="ruleCount">0</span>)</h2>
+        <button type="button" id="refreshBtn" class="btn btn-small btn-clear">Refresh</button>
+      </div>
+      <div id="rulesList" class="rules-list">
+        <div class="empty-state">Connect to the mock server to see rules.</div>
+      </div>
+
+      <!-- Add rule form -->
+      <form id="addRuleForm" class="add-rule-form">
+        <div class="add-rule-row">
+          <input type="text" id="patternInput" placeholder="URL pattern" required>
+          <label class="regex-toggle" title="Treat pattern as regex">
+            <input type="checkbox" id="regexCheck"> regex
+          </label>
+        </div>
+        <div class="add-rule-row file-row">
+          <label id="filePickerLabel" class="file-picker-label">
+            <span id="filePickerText">Choose file…</span>
+            <input type="file" id="fileUpload" class="hidden" required>
+          </label>
+          <button type="submit" class="btn btn-small btn-primary">Add</button>
+        </div>
+        <small id="uploadStatus" class="upload-status hidden"></small>
+      </form>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="activity-section">
+      <h2>Recent Activity</h2>
+      <div id="activityList" class="activity-list">
+        <div class="empty-activity">No recent activity</div>
+      </div>
+    </div>
+
+    <!-- Help -->
+    <div class="help-section-bottom">
+      <details>
+        <summary>Setup Guide</summary>
+        <ol>
+          <li>Create a <code>.mocks.json</code> file in your project directory</li>
+          <li>Add rules mapping URL patterns to local files:
+            <pre>[
+  {
+    "pattern": "address-book\\.json",
+    "file": "./stubs/address-book.json",
+    "isRegex": true
+  }
+]</pre>
+          </li>
+          <li>Start the server: <code>node mock-server.js</code></li>
+          <li>Toggle the extension on — matched requests will serve your local files</li>
+          <li>Edit stub files in place — changes are picked up on next request</li>
+        </ol>
+      </details>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
