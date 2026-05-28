@@ -1,0 +1,8 @@
+{
+  "message": "Hello from test data!",
+  "timestamp": "2026-05-28",
+  "data": [
+    {"id": 1, "name": "Test Item 1"},
+    {"id": 2, "name": "Test Item 2"}
+  ]
+}

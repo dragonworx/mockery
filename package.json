@@ -4,7 +4,8 @@
   "description": "Chrome extension to intercept HTTP requests and serve stubbed responses",
   "main": "mock-server.js",
   "scripts": {
-    "start": "node mock-server.js"
+    "start": "node mock-server.js",
+    "kill": "pkill -f 'node mock-server.js' || true"
   },
   "keywords": [
     "chrome-extension",

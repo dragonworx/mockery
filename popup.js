@@ -139,60 +139,124 @@ async function handleFileSelected() {
 
   filePickerText.textContent = file.name;
 
-  // Auto-suggest a path based on the filename
-  const suggestedPath = `./mocks/${file.name}`;
-  if (!filePathInput.value || filePathInput.value === '') {
-    filePathInput.value = suggestedPath;
-  }
-
-  uploadStatus.textContent = `Selected: ${file.name}`;
+  // With the new approach using File API, we can read the file content directly
+  uploadStatus.textContent = `Selected: ${file.name} — Ready to upload! Just click "Add" to save it to the mocks folder.`;
   uploadStatus.className = 'upload-status';
   uploadStatus.style.color = '#28a745';
+
+  // Hide the file path input since we don't need it for file uploads anymore
+  filePathInput.style.display = 'none';
+
+  // Hide the path hint as well
+  const pathHint = filePathInput.nextElementSibling;
+  if (pathHint && pathHint.classList.contains('path-hint')) {
+    pathHint.style.display = 'none';
+  }
 }
 
 async function handleAddRule(e) {
-  e.preventDefault();
-  const pattern = patternInput.value.trim();
-  const filePath = filePathInput.value.trim();
-  const isRegex = regexCheck.checked;
-
-  if (!pattern) {
-    showNotification('Please enter a URL pattern', 'error');
-    return;
-  }
-  if (!filePath) {
-    showNotification('Please specify a file path', 'error');
-    return;
-  }
-
-  if (isRegex) {
-    try { new RegExp(pattern); }
-    catch { showNotification('Invalid regex pattern', 'error'); return; }
-  }
-
-  const base = await serverBase();
   try {
-    const resp = await fetch(`${base}/rules`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pattern, file: filePath, isRegex }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error);
+    e.preventDefault();
+    const pattern = patternInput.value.trim();
+    const isRegex = regexCheck.checked;
+    const selectedFile = fileUpload.files[0];
 
-    // Clear form
-    patternInput.value = '';
-    filePathInput.value = '';
-    fileUpload.value = '';
-    filePickerText.textContent = 'Choose file…';
-    uploadStatus.className = 'upload-status hidden';
-    regexCheck.checked = false;
+    if (!pattern) {
+      showNotification('Please enter a URL pattern', 'error');
+      return;
+    }
 
-    renderRules(data.rules);
-    showNotification('Rule added', 'success');
+    // Check if we need a file (either file selected or path provided)
+    const manualPath = filePathInput.value.trim();
+    if (!selectedFile && !manualPath) {
+      showNotification('Please select a file or enter a file path', 'error');
+      return;
+    }
+
+    if (isRegex) {
+      try { new RegExp(pattern); }
+      catch { showNotification('Invalid regex pattern', 'error'); return; }
+    }
+
+    const base = await serverBase();
+    let filePath = manualPath; // Default to manual path if provided
+
+    try {
+      // If a file was selected, read its content and save to mocks folder
+      if (selectedFile) {
+        uploadStatus.textContent = 'Reading and saving file to mocks folder...';
+        uploadStatus.style.color = '#ff6b35';
+
+        // Read file content using File API
+        const fileContent = await readFileContent(selectedFile);
+
+        // Save file content to mocks folder
+        const saveResp = await fetch(`${base}/save-file`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileContent: fileContent,
+            fileName: selectedFile.name
+          }),
+        });
+
+        const saveData = await saveResp.json();
+        if (!saveResp.ok) throw new Error(saveData.error);
+
+        // Use the relative path from the save operation
+        filePath = saveData.filePath;
+
+        uploadStatus.textContent = `File saved to ${saveData.filePath}`;
+        uploadStatus.style.color = '#28a745';
+      }
+
+      // Add the rule with the file path
+      const resp = await fetch(`${base}/rules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pattern, file: filePath, isRegex }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error);
+
+      // Clear form
+      patternInput.value = '';
+      filePathInput.value = '';
+      fileUpload.value = '';
+      filePickerText.textContent = 'Choose file…';
+      uploadStatus.className = 'upload-status hidden';
+      regexCheck.checked = false;
+
+      // Show the file path input again for next use
+      filePathInput.style.display = 'block';
+
+      // Show the path hint as well
+      const pathHint = filePathInput.nextElementSibling;
+      if (pathHint && pathHint.classList.contains('path-hint')) {
+        pathHint.style.display = 'block';
+      }
+
+      renderRules(data.rules);
+      showNotification('Rule added', 'success');
+    } catch (err) {
+      uploadStatus.textContent = '';
+      showError(`Failed: ${err.message}`, err);
+    }
   } catch (err) {
-    showNotification(`Failed: ${err.message}`, 'error');
+    // Catch any unexpected errors (like null reference errors)
+    uploadStatus.textContent = '';
+    showError(`Unexpected error: ${err.message}`, err);
   }
+}
+
+// Helper function to read file content using File API
+function readFileContent(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = (e) => reject(new Error(`Failed to read file: ${e.target.error}`));
+    reader.readAsText(file);
+  });
 }
 
 // ── Delete rule ───────────────────────────────────────────────────────────────
@@ -209,7 +273,7 @@ async function handleDeleteRule(pattern) {
     renderRules(data.rules);
     showNotification('Rule deleted', 'success');
   } catch (err) {
-    showNotification(`Failed: ${err.message}`, 'error');
+    showError(`Failed: ${err.message}`, err);
   }
 }
 
@@ -262,17 +326,64 @@ function escapeHtml(text) {
   return d.innerHTML;
 }
 
-function showNotification(message, type) {
+function showNotification(message, type, error = null) {
   const existing = document.querySelector('.notification');
   if (existing) existing.remove();
 
   const el = document.createElement('div');
   el.className = `notification notification-${type}`;
-  el.textContent = message;
-  document.body.appendChild(el);
 
-  setTimeout(() => {
-    el.style.opacity = '0';
-    setTimeout(() => el.remove(), 300);
-  }, 2000);
+  // If it's an error and we have an error object, show enhanced details
+  if (type === 'error' && error instanceof Error) {
+    const messageEl = document.createElement('div');
+    messageEl.textContent = message;
+    messageEl.style.fontWeight = 'bold';
+
+    const detailsEl = document.createElement('details');
+    detailsEl.style.marginTop = '8px';
+    detailsEl.style.fontSize = '11px';
+
+    const summaryEl = document.createElement('summary');
+    summaryEl.textContent = 'Show technical details';
+    summaryEl.style.cursor = 'pointer';
+    summaryEl.style.color = '#ccc';
+
+    const stackEl = document.createElement('pre');
+    stackEl.textContent = error.stack || error.message;
+    stackEl.style.fontSize = '10px';
+    stackEl.style.marginTop = '4px';
+    stackEl.style.padding = '4px';
+    stackEl.style.backgroundColor = 'rgba(0,0,0,0.1)';
+    stackEl.style.borderRadius = '3px';
+    stackEl.style.overflow = 'auto';
+    stackEl.style.maxHeight = '100px';
+    stackEl.style.whiteSpace = 'pre-wrap';
+
+    detailsEl.appendChild(summaryEl);
+    detailsEl.appendChild(stackEl);
+
+    el.appendChild(messageEl);
+    el.appendChild(detailsEl);
+
+    // Longer timeout for error messages with details
+    setTimeout(() => {
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 300);
+    }, 5000);
+  } else {
+    // Standard notification
+    el.textContent = message;
+    setTimeout(() => {
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 300);
+    }, 2000);
+  }
+
+  document.body.appendChild(el);
+}
+
+// Enhanced error notification helper
+function showError(message, error) {
+  console.error('Extension error:', message, error);
+  showNotification(message, 'error', error);
 }

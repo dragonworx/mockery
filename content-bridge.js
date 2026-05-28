@@ -76,7 +76,7 @@ window.addEventListener('message', async (event) => {
         mime: result.mime,
       }, '*');
 
-      showToast(url, result.file);
+      showToast(url, result.file, 'success');
     } else {
       window.postMessage({
         channel: CHANNEL,
@@ -84,6 +84,10 @@ window.addEventListener('message', async (event) => {
         id,
         error: true,
       }, '*');
+
+      // Show error toast with details
+      const errorMessage = result?.detail ? parseErrorDetail(result.detail) : result?.error || 'Unknown error';
+      showToast(url, null, 'error', errorMessage);
     }
   } catch (err) {
     window.postMessage({
@@ -92,10 +96,27 @@ window.addEventListener('message', async (event) => {
       id,
       error: true,
     }, '*');
+
+    showToast(url, null, 'error', 'Server connection failed');
   }
 });
 
 // ── Toast notifications ─────────────────────────────────────────────────────
+
+function parseErrorDetail(detail) {
+  try {
+    const error = JSON.parse(detail);
+    if (error.error === 'File read error') {
+      return `File not found: ${error.file}`;
+    }
+    if (error.error === 'No matching rule') {
+      return 'No rule matches this URL';
+    }
+    return error.error || 'Unknown error';
+  } catch {
+    return detail || 'Unknown error';
+  }
+}
 
 let toastContainer = null;
 
@@ -115,7 +136,7 @@ function ensureToastContainer() {
   return toastContainer;
 }
 
-function showToast(url, file) {
+function showToast(url, file, type = 'success', customMessage = null) {
   const container = ensureToastContainer();
   let displayUrl = url;
   try {
@@ -124,10 +145,17 @@ function showToast(url, file) {
     if (displayUrl.length > 50) displayUrl = displayUrl.substring(0, 47) + '…';
   } catch {}
 
+  const isError = type === 'error';
   const toast = document.createElement('div');
+
+  // Different styles for success vs error
+  const backgroundColor = isError ? '#f8d7da' : '#d4edda';
+  const textColor = isError ? '#721c24' : '#155724';
+  const borderColor = isError ? '#f5c6cb' : '#c3e6cb';
+
   toast.style.cssText = `
-    background: #d4edda; color: #155724;
-    border: 1px solid #c3e6cb;
+    background: ${backgroundColor}; color: ${textColor};
+    border: 1px solid ${borderColor};
     padding: 12px 16px; border-radius: 6px;
     margin-bottom: 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
@@ -137,7 +165,14 @@ function showToast(url, file) {
     opacity: 0; transform: translateX(100%);
     transition: all 0.3s ease-out;
   `;
-  toast.textContent = `🔄 Mock: ${displayUrl} → ${file || 'stub'}`;
+
+  // Different messages for success vs error
+  if (isError) {
+    toast.textContent = `❌ Mock Error: ${displayUrl} - ${customMessage}`;
+  } else {
+    toast.textContent = `🔄 Mock: ${displayUrl} → ${file || 'stub'}`;
+  }
+
   container.appendChild(toast);
 
   requestAnimationFrame(() => {
@@ -145,11 +180,13 @@ function showToast(url, file) {
     toast.style.transform = 'translateX(0)';
   });
 
+  // Error toasts stay longer (6s vs 4s)
+  const duration = isError ? 6000 : 4000;
   setTimeout(() => {
     toast.style.opacity = '0';
     toast.style.transform = 'translateX(100%)';
     setTimeout(() => toast.remove(), 300);
-  }, 4000);
+  }, duration);
 }
 
 console.log('[HTTP Mocker] ISOLATED bridge loaded');

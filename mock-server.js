@@ -128,11 +128,19 @@ const server = http.createServer((req, res) => {
     }
 
     // Resolve file path - handle both absolute and relative paths
+    // Relative paths are resolved from project root, with mocks folder as fallback
     let filePath;
     if (path.isAbsolute(rule.file)) {
       filePath = rule.file;
     } else {
-      filePath = path.resolve(path.dirname(configPath), rule.file);
+      // Try relative to project root first
+      const relativeFromRoot = path.resolve(path.dirname(configPath), rule.file);
+      if (fs.existsSync(relativeFromRoot)) {
+        filePath = relativeFromRoot;
+      } else {
+        // Fallback to resolving relative to project root (handles mocks/ paths)
+        filePath = path.resolve(process.cwd(), rule.file);
+      }
     }
 
     fs.readFile(filePath, (err, data) => {
@@ -177,6 +185,9 @@ const server = http.createServer((req, res) => {
           res.end(JSON.stringify({ error: 'pattern and file are required' }));
           return;
         }
+
+        // Allow both absolute and relative paths (relative paths are in mocks folder)
+        // No validation needed - we handle both cases in the resolve logic
         rules.push({ pattern: rule.pattern, file: rule.file, isRegex: !!rule.isRegex });
         const snapshot = [...rules];
         fs.writeFileSync(configPath, JSON.stringify(snapshot, null, 2));
@@ -213,6 +224,69 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── POST /save-file — save file content to mocks folder ──────────────────────────
+  if (parsed.pathname === '/save-file' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const { fileContent, fileName } = JSON.parse(body);
+        if (!fileContent || !fileName) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'fileContent and fileName are required' }));
+          return;
+        }
+
+        // Create mocks directory if it doesn't exist
+        const mocksDir = path.join(process.cwd(), 'mocks');
+        if (!fs.existsSync(mocksDir)) {
+          fs.mkdirSync(mocksDir, { recursive: true });
+        }
+
+        // Generate unique filename to avoid conflicts
+        const timestamp = Date.now();
+        const ext = path.extname(fileName);
+        const baseName = path.basename(fileName, ext);
+        const uniqueFileName = `${baseName}_${timestamp}${ext}`;
+        const destPath = path.join(mocksDir, uniqueFileName);
+        const relativePath = path.join('mocks', uniqueFileName);
+
+        // Save the file content
+        fs.writeFile(destPath, fileContent, 'utf8', (err) => {
+          if (err) {
+            console.error(`[mock-server] File save error: ${destPath}`, err.message);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'File save error', detail: err.message }));
+            return;
+          }
+
+          console.log(`[mock-server] File saved: ${relativePath}`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: true,
+            filePath: relativePath,
+            originalName: fileName,
+            uniqueName: uniqueFileName
+          }));
+        });
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // ── GET /pwd — return current working directory ─────────────────────────
+  if (parsed.pathname === '/pwd' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      cwd: process.cwd(),
+      mocksDir: path.join(process.cwd(), 'mocks')
+    }));
+    return;
+  }
+
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Not found' }));
 });
@@ -225,5 +299,7 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`  GET /rules                   — list current rules`);
   console.log(`  POST /rules                  — add a rule`);
   console.log(`  DELETE /rules                — remove a rule`);
+  console.log(`  POST /save-file              — save file content to mocks folder`);
   console.log(`  GET /health                  — server status`);
+  console.log(`  GET /pwd                     — get project directory`);
 });

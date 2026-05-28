@@ -1,7 +1,7 @@
 [
   {
-    "pattern": "https://www.stg.commbank.com.au/content/netbank/tracking/dhp/retail/netbank/core/banking/payments/payment-settings/address-book.smtnbnxt.json",
-    "file": "./mocks/test.json",
+    "pattern": "https://netbank.web.test2.commbank.com.au/auth/logoff?reason=timeout",
+    "file": "mocks/test_1779965721456.json",
     "isRegex": false
   }
 ]

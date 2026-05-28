@@ -63,6 +63,11 @@ node mock-server.js 9000 --config ./my-mocks.json
 npm start
 ```
 
+To stop the server:
+```bash
+npm run kill
+```
+
 ### 2. Configure the Extension
 1. Click the extension icon in Chrome
 2. Verify server connection (green dot = connected)
