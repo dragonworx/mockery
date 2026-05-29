@@ -25,7 +25,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 /**
- * Update declarativeNetRequest rules based on current .mocks/config.json
+ * Update declarativeNetRequest rules based on current .mocks/config.js
  */
 async function updateDeclarativeRules() {
   try {
@@ -64,6 +64,12 @@ async function updateDeclarativeRules() {
         },
         condition: {}
       };
+
+      // Skip non-GET rules — declarativeNetRequest only handles resource loads (always GET)
+      const ruleMethod = (rule.method || '*').toUpperCase();
+      if (ruleMethod !== '*' && ruleMethod !== 'GET') {
+        continue;
+      }
 
       // Set up URL matching and redirection
       // Use simpler urlFilter to avoid 2KB regex limit
@@ -128,6 +134,85 @@ chrome.storage.local.onChanged.addListener((changes) => {
 });
 
 /**
+ * SSE connection for hot reload — listens for config changes on the server
+ * and notifies all tabs to re-fetch rules.
+ */
+let sseRetryTimeout = null;
+
+function connectSSE() {
+  chrome.storage.local.get(['serverUrl', 'enabled'], ({ serverUrl, enabled }) => {
+    if (enabled === false) return;
+
+    const base = serverUrl || DEFAULT_SERVER;
+    const controller = new AbortController();
+
+    fetch(`${base}/events`, { signal: controller.signal })
+      .then(response => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        function read() {
+          reader.read().then(({ done, value }) => {
+            if (done) {
+              // Connection closed — reconnect
+              scheduleSSEReconnect();
+              return;
+            }
+
+            const text = decoder.decode(value, { stream: true });
+            const lines = text.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const event = JSON.parse(line.slice(6));
+                  if (event.type === 'config-changed') {
+                    console.log('[HTTP Mocker] Config changed, notifying tabs…');
+                    notifyAllTabs();
+                    updateDeclarativeRules();
+                  }
+                } catch {}
+              }
+            }
+            read();
+          }).catch(() => scheduleSSEReconnect());
+        }
+
+        read();
+      })
+      .catch(() => scheduleSSEReconnect());
+
+    // Store controller so we can abort on disable
+    globalThis.__sseController = controller;
+  });
+}
+
+function scheduleSSEReconnect() {
+  if (sseRetryTimeout) clearTimeout(sseRetryTimeout);
+  sseRetryTimeout = setTimeout(connectSSE, 3000);
+}
+
+function notifyAllTabs() {
+  chrome.tabs.query({}, (tabs) => {
+    for (const tab of tabs) {
+      chrome.tabs.sendMessage(tab.id, { type: 'RULES_CHANGED' }).catch(() => {});
+    }
+  });
+}
+
+// Start SSE connection
+connectSSE();
+
+// Reconnect SSE when server URL or enabled state changes
+chrome.storage.local.onChanged.addListener((changes) => {
+  if (changes.serverUrl || changes.enabled) {
+    if (globalThis.__sseController) {
+      globalThis.__sseController.abort();
+    }
+    connectSSE();
+  }
+});
+
+/**
  * Handle RESOLVE_MOCK messages from content scripts.
  * Fetches the mock body from the companion Node server.
  */
@@ -149,7 +234,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       const base = serverUrl || DEFAULT_SERVER;
-      const url = `${base}/resolve?url=${encodeURIComponent(message.url)}`;
+      const method = (message.method || 'GET').toUpperCase();
+      const url = `${base}/resolve?url=${encodeURIComponent(message.url)}&method=${encodeURIComponent(method)}`;
 
       const resp = await fetch(url);
 
@@ -185,6 +271,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // Log activity
       const activity = {
         url: message.url,
+        method,
         mime,
         timestamp: new Date().toISOString(),
       };

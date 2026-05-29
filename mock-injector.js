@@ -37,11 +37,14 @@
   window.postMessage({ channel: CHANNEL, type: 'REQUEST_RULES' }, '*');
 
   // ── Matching ──────────────────────────────────────────────────────────
-  function findMatch(url) {
+  function findMatch(url, method) {
     if (!enabled || rules.length === 0) return null;
+    const normalizedMethod = (method || 'GET').toUpperCase();
 
     for (const rule of rules) {
       try {
+        const ruleMethod = (rule.method || '*').toUpperCase();
+        if (ruleMethod !== '*' && ruleMethod !== normalizedMethod) continue;
         if (rule.isRegex) {
           if (new RegExp(rule.pattern).test(url)) return rule;
         } else {
@@ -58,11 +61,11 @@
   let _reqId = 0;
   const _pending = new Map();
 
-  function requestMock(url) {
+  function requestMock(url, method) {
     return new Promise((resolve) => {
       const id = ++_reqId;
       _pending.set(id, resolve);
-      window.postMessage({ channel: CHANNEL, type: 'RESOLVE_MOCK', id, url }, '*');
+      window.postMessage({ channel: CHANNEL, type: 'RESOLVE_MOCK', id, url, method: method || 'GET' }, '*');
 
       // Timeout — fall through to real network after 5 s
       setTimeout(() => {
@@ -92,17 +95,18 @@
 
   window.fetch = async function (input, init) {
     const url = (typeof input === 'string') ? input : (input instanceof Request ? input.url : String(input));
+    const method = (init && init.method) ? init.method.toUpperCase() : (input instanceof Request ? input.method.toUpperCase() : 'GET');
 
-    const rule = findMatch(url);
+    const rule = findMatch(url, method);
 
     if (rule) {
-      const mock = await requestMock(url);
+      const mock = await requestMock(url, method);
 
       if (mock) {
         if (enableLogging) {
           let parsed;
           try { parsed = JSON.parse(mock.body); } catch { parsed = mock.body; }
-          console.groupCollapsed(`[HTTP Mocker] fetch → ${rule.file}`);
+          console.groupCollapsed(`[HTTP Mocker] fetch → ${rule.file || 'handler'}`);
           console.log('url ', url);
           console.log('mime', mock.mime);
           console.log('body', parsed);
@@ -141,7 +145,8 @@
 
   XHR.prototype.open = function (method, url, ...rest) {
     this.__mockUrl = (typeof url === 'string') ? url : String(url);
-    this.__mockRule = findMatch(this.__mockUrl);
+    this.__mockMethod = (typeof method === 'string') ? method.toUpperCase() : 'GET';
+    this.__mockRule = findMatch(this.__mockUrl, this.__mockMethod);
     return origOpen.call(this, method, url, ...rest);
   };
 
@@ -155,7 +160,7 @@
     const xhr = this;
     const url = xhr.__mockUrl;
 
-    requestMock(url).then((mock) => {
+    requestMock(url, xhr.__mockMethod || 'GET').then((mock) => {
       if (!mock) {
         // Fallback to real network
         origSend.call(xhr, body);

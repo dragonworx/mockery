@@ -5,7 +5,8 @@
   "description": "Intercept HTTP requests and return mock responses from a local Node companion server",
   "permissions": [
     "storage",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "tabs"
   ],
   "host_permissions": [
     "http://localhost/*",

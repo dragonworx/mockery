@@ -6,23 +6,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 HTTP Request Mocker is a Chrome extension with a companion Node.js server that intercepts HTTP requests and returns mock responses. The extension uses Manifest V3 and injects code into the page's main world to patch `fetch()` and `XMLHttpRequest`.
 
+**Zero Dependencies** - This project runs with just Node.js (18+) and has no external dependencies. No package.json, no node_modules, no build steps!
+
+## Quick Start
+
+For developers who just downloaded this repository:
+
+```bash
+# 1. Clone the repository
+git clone <repo-url>
+cd http-request-mocker
+
+# 2. Start the server (no installation needed!)
+node mock-server.js
+
+# 3. Load the Chrome extension
+# - Go to chrome://extensions/
+# - Enable "Developer mode"
+# - Click "Load unpacked" and select this folder
+# - The extension is ready to use!
+```
+
 ## Common Commands
 
 ### Server Operations
 ```bash
 # Start the mock server (default port 8756)
-npm start
-# or
 node mock-server.js
 
 # Start with custom port
 node mock-server.js 9000
 
 # Start with custom config file
-node mock-server.js --config ./my-mocks.json
+node mock-server.js --config ./my-mocks.js
 
-# Stop the server
-npm run kill
+# Auto-restart server on changes (Node.js 18+)
+node --watch mock-server.js
+
+# Stop the server (if needed)
+pkill -f 'node.*mock-server.js'
 ```
 
 ### Extension Development
@@ -32,12 +54,12 @@ npm run kill
 4. Reload test pages to see changes
 
 **Refreshing Rules:**
-- Edit `.mocks/config.json` or add/modify files in `.mocks/` folder
+- Edit `.mocks/config.js` or add/modify files in `.mocks/` folder
 - Click "Refresh Rules" in the extension popup to update both JavaScript and declarativeNetRequest rules
 - Or restart the server to automatically refresh rules on next page load
 
 **Handler Hot Reload:**
-- Install chokidar for automatic handler reloading: `npm run install-hot-reload`
+- Install chokidar for automatic handler reloading: `npm install chokidar` (optional)
 - Handler files automatically reload when saved (no server restart needed)
 - Check server console for reload notifications
 
@@ -54,7 +76,7 @@ The extension uses a **hybrid architecture** that intercepts different types of 
 
 2. **HTML Resource Requests** (img tags, CSS, script tags)
    - **declarativeNetRequest API** - intercepts at network layer
-   - **Dynamic Rule Generation** - converts .mocks/config.json to Chrome rules
+   - **Dynamic Rule Generation** - converts .mocks/config.js to Chrome rules
    - **Redirect to Server** - routes to same Node.js companion server
 
 ### Message Flow Examples
@@ -96,61 +118,86 @@ Rules are managed through direct file system manipulation:
 
 1. **Create mock files** in the `.mocks/` folder (or subfolders)
 2. **Create handler functions** in the `.mocks/handlers/` folder (optional)
-3. **Edit `.mocks/config.json`** by hand to add URL patterns, file paths, and handlers
-4. **Server hot-reloads** configuration when `.mocks/config.json` or handler files change
+3. **Edit `.mocks/config.js`** to add URL patterns, file paths, and handlers (inline or imported)
+4. **Server hot-reloads** configuration when `.mocks/config.js` or handler files change
 
 ### Configuration File
 
-`.mocks/config.json` format:
-```json
-[
+`.mocks/config.js` format (JavaScript module):
+```javascript
+// HTTP Request Mocker Configuration
+module.exports = [
   {
-    "pattern": "https://api.example.com/users",
-    "file": "users.json",
-    "isRegex": false
+    pattern: "https://api.example.com/users",
+    file: "users.json",
+    isRegex: false
   },
   {
-    "pattern": "https://api.example.com/dynamic",
-    "handler": "handlers/dynamic-response.js"
+    pattern: "https://api.example.com/dynamic",
+    // Inline handler function
+    handler: async (request, originalResponse) => {
+      return {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `Hello from ${request.method} ${request.url}`,
+          timestamp: new Date().toISOString()
+        })
+      };
+    }
   },
   {
-    "pattern": "https://api.example.com/enhanced",
-    "file": "users.json",
-    "handler": "handlers/modify-response.js"
+    pattern: "https://api.example.com/enhanced",
+    file: "users.json",
+    handler: require('./handlers/modify-response.js'), // Import handler
   },
   {
-    "pattern": ".*\\.example\\.com.*address-book.*",
-    "file": "api/address-book.json",
-    "isRegex": true
+    pattern: ".*\\.example\\.com.*address-book.*",
+    file: "api/address-book.json",
+    isRegex: true
   }
-]
+];
 ```
 
-### Handler Functions (New Feature)
+### Handler Functions
 
-Handler functions allow dynamic response generation and modification:
+Handler functions allow dynamic response generation and modification with three approaches:
 
-- **File**: `"handlers/dynamic.js"` resolves to `.mocks/handlers/dynamic.js`
+- **Inline Functions**: Define handlers directly in `config.js`
+- **Imported Modules**: Import handlers using `require('./handlers/file.js')`
+- **File Path Strings**: Reference handler files by path (legacy support)
 - **Function signature**: `async (request, originalResponse) => responseObject`
-- **Hot reload**: Automatically reloads when handler files change (requires `chokidar`)
+- **Hot reload**: Configuration and handler files reload automatically
 - **Combination**: Can be used with `file` to modify existing responses
 
-**Handler API:**
+**Inline Handler Example:**
 ```javascript
-// .mocks/handlers/example.js
-module.exports = async (request, originalResponse) => {
-  // request: { url, method, headers, body, query, timestamp }
-  // originalResponse: { status, headers, body } or null
-
-  return {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message: 'Dynamic response',
-      timestamp: new Date().toISOString()
+module.exports = [
+  {
+    pattern: "https://api.example.com/time",
+    handler: async (request) => ({
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        time: new Date().toISOString(),
+        url: request.url
+      })
     })
-  };
-};
+  }
+];
+```
+
+**Imported Handler Example:**
+```javascript
+// config.js
+const dynamicHandler = require('./handlers/dynamic.js');
+
+module.exports = [
+  {
+    pattern: "https://api.example.com/dynamic",
+    handler: dynamicHandler
+  }
+];
 ```
 
 ### File Path Resolution
@@ -158,7 +205,7 @@ module.exports = async (request, originalResponse) => {
 Relative paths in rules are resolved as follows:
 - Simple filenames (e.g. `"users.json"`) automatically resolve to `.mocks/users.json`
 - Paths with directories (e.g. `"api/users.json"`) resolve to `.mocks/api/users.json`
-- Paths starting with `./` or `../` are resolved relative to `.mocks/config.json` location
+- Paths starting with `./` or `../` are resolved relative to `.mocks/config.js` location
 - Absolute paths are used as-is
 
 ### Folder Organization
@@ -166,11 +213,16 @@ Relative paths in rules are resolved as follows:
 The `.mocks/` folder can be organized however you prefer:
 ```
 .mocks/
-├── config.json         # Main configuration file
+├── config.js           # Main configuration file (JavaScript module)
 ├── api/
 │   ├── users.json
 │   └── auth/
 │       └── token.json
+├── handlers/           # JavaScript handler files
+│   ├── search-filter.js
+│   ├── dynamic-response.js
+│   └── utils/
+│       └── common-responses.js
 ├── images/
 │   ├── logo.svg
 │   └── avatar.png
@@ -245,18 +297,18 @@ The extension properly handles binary files (images, PDFs, fonts, archives) by:
 ## Server API Endpoints
 
 - `GET /health` — Server status and rule count
-- `GET /rules` — List all rules from .mocks/config.json
+- `GET /rules` — List all rules from .mocks/config.js
 - `GET /resolve?url=<encoded>` — Resolve mock for URL (used by extension)
 
 ## Testing Handler Functions
 
-The new handler functionality can be tested directly through the mock server endpoints:
+The handler functionality can be tested directly through the mock server endpoints:
 
 ### Test Examples with curl
 
 ```bash
 # Start the server
-npm start
+node mock-server.js
 
 # Test static file response
 curl "http://localhost:8756/resolve?url=https://api.example.com/users"
@@ -293,7 +345,7 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 ### Extension Permissions
 - `storage` — for persisting enabled state and server URL
 - `host_permissions: ["http://localhost/*"]` — for communicating with Node server
-- No `declarativeNetRequest` — v2.0 uses main-world injection instead
+- `declarativeNetRequest` — for intercepting HTML resource requests
 
 ### Security Considerations
 - Extension only communicates with localhost by default
@@ -316,9 +368,22 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 ├── background.js          # Background service worker
 ├── content-bridge.js      # ISOLATED-world bridge script
 ├── mock-injector.js       # MAIN-world request interceptor
-├── popup.html/js/css      # Extension popup UI (simplified, read-only)
-├── mock-server.js         # Node.js companion server
-├── .mocks/              # Mock response files (organize as needed)
-│   └── config.json      # Server configuration (edit by hand)
-├── package.json          # Node.js package config
+├── popup.html/js/css      # Extension popup UI
+├── mock-server.js         # Node.js companion server (zero dependencies!)
+└── .mocks/               # Mock response files (organize as needed)
+    ├── config.js         # Server configuration (JavaScript module)
+    └── handlers/         # JavaScript handler functions
 ```
+
+## Distribution Benefits
+
+This setup provides the ultimate simplicity for developers:
+
+✅ **No build steps** - Everything runs directly
+✅ **No dependencies** - Works with just Node.js 18+
+✅ **No package managers** - No npm, yarn, or bun needed
+✅ **No compilation** - Pure JavaScript, ready to run
+✅ **Instant setup** - Clone and run in seconds
+✅ **Zero configuration** - Works out of the box
+
+Perfect for quick demos, testing, development tools, and sharing with team members who just want it to work immediately!

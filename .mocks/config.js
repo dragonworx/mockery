@@ -3,68 +3,58 @@
 
 module.exports = [
   {
-    pattern: "https://api.example.com/users",
-    file: "data/users.json",
-    comment: "Static file response"
-  },
-  {
-    pattern: "https://api.example.com/users/enhanced",
-    file: "data/users.json",
-    // Inline handler function - adds timestamps and metadata to users
-    handler: async (request, originalResponse) => {
-      if (!originalResponse) {
-        return {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: 'Original file not found' })
-        };
-      }
-
-      const users = JSON.parse(originalResponse.body);
-      const enhanced = {
-        ...users,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          requestUrl: request.url,
-          method: request.method,
-          enhanced: true
-        }
-      };
-
-      return {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(enhanced, null, 2)
-      };
-    }
-  },
-  {
-    pattern: "https://api.example.com/search",
-    file: "data/users.json",
-    handler: require('./handlers/search-filter.js'), // Import handler from file
-    comment: "File + imported handler: searchable and filterable users (try ?q=john&sort=name&limit=2)"
-  },
-  {
-    pattern: "https://api.example.com/dynamic",
-    // Inline handler-only response - no file needed
+    pattern: "^https://edge\\.adobedc\\.net/ee/aus3/v1/interact",
+    method: "POST",
+    isRegex: true,
     handler: async (request) => {
-      const url = new URL(request.url);
-      const name = url.searchParams.get('name') || 'Anonymous';
-      const count = parseInt(url.searchParams.get('count')) || 1;
+      // Returns a realistic Adobe interact response
+      // Modify the handle array payloads as needed for testing
+      console.log(`[mock-server] Adobe interact intercepted: ${request.url}`);
 
       return {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `Hello ${name}!`,
-          count: count,
-          timestamp: new Date().toISOString(),
-          method: request.method,
-          query: Object.fromEntries(url.searchParams),
-          generated: true
-        }, null, 2)
+          _note: "This response was intercepted and modified by HTTP Request Mocker",
+          requestId: "mock-" + Date.now() + "-eb3a650cdadd4c6c",
+          handle: [
+            {
+              payload: [
+                {
+                  id: "66399669542236699145201687189591800040",
+                  namespace: { code: "ECID" }
+                }
+              ],
+              type: "identity:result"
+            },
+            {
+              payload: [],
+              type: "personalization:decisions",
+              eventIndex: 0
+            },
+            {
+              payload: [
+                { scope: "Target", hint: "36", ttlSeconds: 1800 },
+                { scope: "AAM", hint: "8", ttlSeconds: 1800 },
+                { scope: "EdgeNetwork", hint: "aus3", ttlSeconds: 1800 }
+              ],
+              type: "locationHint:result"
+            },
+            {
+              payload: [
+                {
+                  key: "kndctr_FFF9306152D80A5C0A490D45_AdobeOrg_cluster",
+                  value: "aus3",
+                  maxAge: 1800,
+                  attrs: { SameSite: "None" }
+                }
+              ],
+              type: "state:store"
+            }
+          ]
+        })
       };
     },
-    comment: "Inline handler-only: completely dynamic response (try ?name=test&count=3)"
+    comment: "Intercept Adobe interact - placeholder proving interception works"
   }
 ];

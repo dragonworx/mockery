@@ -55,6 +55,14 @@ window.addEventListener('message', (event) => {
   }
 });
 
+// Re-push when background notifies of config change (SSE hot reload)
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'RULES_CHANGED') {
+    console.log('[HTTP Mocker] Hot reload: rules updated');
+    pushRules();
+  }
+});
+
 // ── Forward mock resolution requests ────────────────────────────────────────
 
 window.addEventListener('message', async (event) => {
@@ -62,13 +70,14 @@ window.addEventListener('message', async (event) => {
   if (!event.data || event.data.channel !== CHANNEL) return;
   if (event.data.type !== 'RESOLVE_MOCK') return;
 
-  const { id, url } = event.data;
+  const { id, url, method } = event.data;
 
   try {
     // Ask the background SW (which can fetch localhost without mixed-content issues)
     const result = await chrome.runtime.sendMessage({
       type: 'RESOLVE_MOCK',
       url,
+      method: method || 'GET',
     });
 
     if (result && !result.error) {

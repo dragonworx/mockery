@@ -4,17 +4,17 @@
  *
  * Usage:
  *   cd /path/to/your/project
- *   node /path/to/mock-server.js            # reads .mocks/config.json from cwd
+ *   node /path/to/mock-server.js            # reads .mocks/config.js from cwd
  *   node /path/to/mock-server.js 9000        # custom port
  *   node /path/to/mock-server.js --config ./my-mocks.json   # custom config path
  *
- * Config format (.mocks/config.json):
- *   [
- *     { "pattern": "https://api.example.com/users", "file": "users.json" },
- *     { "pattern": "https://api.example.com/dynamic", "handler": "handlers/dynamic.js" },
- *     { "pattern": "https://api.example.com/modify", "file": "users.json", "handler": "handlers/modify.js" },
- *     { "pattern": "address-book\\.smtnbnxt\\.json", "file": "icon.svg", "isRegex": true }
- *   ]
+ * Config format (.mocks/config.js):
+ *   module.exports = [
+ *     { pattern: "https://api.example.com/users", file: "users.json" },
+ *     { pattern: "https://api.example.com/dynamic", handler: async (req) => ({ status: 200, body: "Hi" }) },
+ *     { pattern: "https://api.example.com/imported", handler: require("./handlers/dynamic.js") },
+ *     { pattern: "address-book\\.smtnbnxt\\.json", file: "icon.svg", isRegex: true }
+ *   ];
  *
  * File paths:
  *   - Relative paths without directory separators default to .mocks/ folder
@@ -61,7 +61,7 @@ try {
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 let port = 8756;
-let configPath = path.join(process.cwd(), '.mocks', 'config.json');
+let configPath = path.join(process.cwd(), '.mocks', 'config.js');
 
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
@@ -77,8 +77,26 @@ let rules = [];
 
 function loadConfig() {
   try {
-    const raw = fs.readFileSync(configPath, 'utf-8');
-    rules = JSON.parse(raw);
+    // Clear require cache to enable hot-reload for .js configs
+    if (configPath.endsWith('.js')) {
+      delete require.cache[require.resolve(configPath)];
+    }
+
+    let loadedRules;
+    if (configPath.endsWith('.js')) {
+      // Load JavaScript config
+      loadedRules = require(configPath);
+    } else {
+      // Load JSON config (backward compatibility)
+      const raw = fs.readFileSync(configPath, 'utf-8');
+      loadedRules = JSON.parse(raw);
+    }
+
+    if (!Array.isArray(loadedRules)) {
+      throw new Error('Config must export an array of rules');
+    }
+
+    rules = loadedRules;
     console.log(`[mock-server] Loaded ${rules.length} rule(s) from ${configPath}`);
   } catch (err) {
     if (err.code === 'ENOENT') {
@@ -86,6 +104,7 @@ function loadConfig() {
       rules = [];
     } else {
       console.error(`[mock-server] Error reading config:`, err.message);
+      rules = [];
     }
   }
 }
@@ -97,15 +116,32 @@ try {
     if (eventType === 'change' || eventType === 'rename') {
       console.log('[mock-server] Config changed, reloading…');
       loadConfig();
+      broadcastConfigChange();
     }
   });
 } catch {
   // file might not exist yet — that's fine
 }
 
+// ── SSE (Server-Sent Events) for hot reload ─────────────────────────────────
+const sseClients = new Set();
+
+function broadcastConfigChange() {
+  const data = `data: ${JSON.stringify({ type: 'config-changed', timestamp: Date.now() })}\n\n`;
+  for (const client of sseClients) {
+    client.write(data);
+  }
+}
+
 // ── Handler loading ─────────────────────────────────────────────────────────
-async function loadHandler(handlerPath) {
-  const fullPath = path.resolve('.mocks', handlerPath);
+async function loadHandler(handlerOrPath) {
+  // If handler is already a function (inline), return it directly
+  if (typeof handlerOrPath === 'function') {
+    return handlerOrPath;
+  }
+
+  // Otherwise, treat it as a file path
+  const fullPath = path.resolve('.mocks', handlerOrPath);
 
   try {
     // Check if handler is cached and file hasn't changed
@@ -137,15 +173,15 @@ async function loadHandler(handlerPath) {
 
     return handler;
   } catch (error) {
-    console.error(`[mock-server] Error loading handler ${handlerPath}:`, error.message);
+    console.error(`[mock-server] Error loading handler ${handlerOrPath}:`, error.message);
     return null;
   }
 }
 
-function buildRequestObject(req, url) {
+function buildRequestObject(req, url, targetMethod) {
   return {
     url,
-    method: req.method,
+    method: targetMethod || req.method,
     headers: req.headers,
     body: req.body || null,
     query: new URL(url).searchParams,
@@ -153,7 +189,7 @@ function buildRequestObject(req, url) {
   };
 }
 
-async function resolveWithHandler(targetUrl, rule, req) {
+async function resolveWithHandler(targetUrl, rule, req, targetMethod) {
   let originalResponse = null;
 
   // Load file response if specified
@@ -183,7 +219,7 @@ async function resolveWithHandler(targetUrl, rule, req) {
     const handler = await loadHandler(rule.handler);
     if (handler) {
       try {
-        const requestObj = buildRequestObject(req, targetUrl);
+        const requestObj = buildRequestObject(req, targetUrl, targetMethod);
         const result = await handler(requestObj, originalResponse);
 
         // Validate handler response
@@ -191,21 +227,24 @@ async function resolveWithHandler(targetUrl, rule, req) {
           throw new Error('Handler must return a response object');
         }
 
-        console.log(`[mock-server] ${targetUrl} → ${rule.handler} (handler)`);
+        const handlerName = typeof rule.handler === 'function' ? 'inline function' : rule.handler;
+        console.log(`[mock-server] ${targetMethod || req.method} ${targetUrl} → ${handlerName} (handler)`);
         return result;
       } catch (err) {
-        console.error(`[mock-server] Handler execution error for ${rule.handler}:`, err.message);
+        const handlerName = typeof rule.handler === 'function' ? 'inline function' : rule.handler;
+        console.error(`[mock-server] Handler execution error for ${handlerName}:`, err.message);
         return {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: 'Handler execution error', handler: rule.handler, detail: err.message })
+          body: JSON.stringify({ error: 'Handler execution error', handler: handlerName, detail: err.message })
         };
       }
     } else {
+      const handlerName = typeof rule.handler === 'function' ? 'inline function' : rule.handler;
       return {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Failed to load handler', handler: rule.handler })
+        body: JSON.stringify({ error: 'Failed to load handler', handler: handlerName })
       };
     }
   }
@@ -287,10 +326,18 @@ function guessMime(filePath) {
 }
 
 // ── Matching ────────────────────────────────────────────────────────────────
-function findMatch(url) {
+function findMatch(url, method) {
+  const normalizedMethod = (method || 'GET').toUpperCase();
+
+  function methodMatches(rule) {
+    const ruleMethod = (rule.method || '*').toUpperCase();
+    return ruleMethod === '*' || ruleMethod === normalizedMethod;
+  }
+
   // First pass: look for exact matches
   for (const rule of rules) {
     try {
+      if (!methodMatches(rule)) continue;
       if (rule.isRegex) {
         if (new RegExp(rule.pattern).test(url)) {
           return rule;
@@ -308,6 +355,7 @@ function findMatch(url) {
   // Second pass: look for substring matches
   for (const rule of rules) {
     try {
+      if (!methodMatches(rule)) continue;
       if (!rule.isRegex) {
         if (url.includes(rule.pattern)) {
           return rule;
@@ -336,7 +384,7 @@ const server = http.createServer(async (req, res) => {
 
   const parsed = new URL(req.url, `http://localhost:${port}`);
 
-  // ── GET /resolve?url=<encoded> ────────────────────────────────────────
+  // ── GET /resolve?url=<encoded>&method=<METHOD> ──────────────────────────
   if (parsed.pathname === '/resolve') {
     const targetUrl = parsed.searchParams.get('url');
     if (!targetUrl) {
@@ -345,16 +393,18 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const rule = findMatch(targetUrl);
+    const targetMethod = (parsed.searchParams.get('method') || 'GET').toUpperCase();
+
+    const rule = findMatch(targetUrl, targetMethod);
     if (!rule) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'No matching rule', url: targetUrl }));
+      res.end(JSON.stringify({ error: 'No matching rule', url: targetUrl, method: targetMethod }));
       return;
     }
 
     try {
       // Use handler-aware resolution
-      const result = await resolveWithHandler(targetUrl, rule, req);
+      const result = await resolveWithHandler(targetUrl, rule, req, targetMethod);
 
       if (!result) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -406,7 +456,8 @@ const server = http.createServer(async (req, res) => {
 
     try {
       // Use handler-aware resolution (use pattern as targetUrl for this endpoint)
-      const result = await resolveWithHandler(pattern, rule, req);
+      // declarativeNetRequest always handles GET resources
+      const result = await resolveWithHandler(pattern, rule, req, 'GET');
 
       if (!result) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -438,6 +489,20 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /events — SSE stream for hot reload ─────────────────────────────
+  if (parsed.pathname === '/events' && req.method === 'GET') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+    sseClients.add(res);
+    req.on('close', () => sseClients.delete(res));
+    return;
+  }
+
   // ── GET /rules — return current rule list ─────────────────────────────
   if (parsed.pathname === '/rules' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -462,6 +527,7 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`[mock-server] Endpoints:`);
   console.log(`  GET /resolve?url=<encoded>       — serve a matched mock`);
   console.log(`  GET /resolve-pattern?pattern=<>  — serve mock by pattern (for declarativeNetRequest)`);
-  console.log(`  GET /rules                       — list current rules from .mocks/config.json`);
-  console.log(`  GET /health                  — server status`);
+  console.log(`  GET /rules                       — list current rules from .mocks/config.js`);
+  console.log(`  GET /events                      — SSE stream for hot reload`);
+  console.log(`  GET /health                      — server status`);
 });
