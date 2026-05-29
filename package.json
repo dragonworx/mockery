@@ -5,7 +5,8 @@
   "main": "mock-server.js",
   "scripts": {
     "start": "node mock-server.js",
-    "kill": "pkill -f 'node mock-server.js' || true"
+    "kill": "pkill -f 'node mock-server.js' || true",
+    "install-hot-reload": "npm install chokidar --save-optional"
   },
   "keywords": [
     "chrome-extension",
@@ -19,5 +20,8 @@
   "license": "ISC",
   "engines": {
     "node": ">=12.0.0"
+  },
+  "optionalDependencies": {
+    "chokidar": "^3.5.3"
   }
 }

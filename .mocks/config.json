@@ -1,0 +1,24 @@
+[
+  {
+    "pattern": "https://api.example.com/users",
+    "file": "data/users.json",
+    "comment": "Static file response"
+  },
+  {
+    "pattern": "https://api.example.com/users/enhanced",
+    "file": "data/users.json",
+    "handler": "handlers/modify-response.js",
+    "comment": "File + handler: adds timestamps and metadata to users"
+  },
+  {
+    "pattern": "https://api.example.com/search",
+    "file": "data/users.json",
+    "handler": "handlers/search-filter.js",
+    "comment": "File + handler: searchable and filterable users (try ?q=john&sort=name&limit=2)"
+  },
+  {
+    "pattern": "https://api.example.com/dynamic",
+    "handler": "handlers/dynamic-response.js",
+    "comment": "Handler-only: completely dynamic response (try ?name=test&count=3)"
+  }
+]

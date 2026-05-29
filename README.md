@@ -15,7 +15,7 @@ A comprehensive Chrome extension with companion Node.js server for intercepting 
 
 ### Node.js Companion Server
 - **Zero Dependencies** - Pure Node.js server with no external packages
-- **Hot Configuration Reload** - Automatically reloads `.mocks.json` when changed
+- **Hot Configuration Reload** - Automatically reloads `.mocks/config.json` when changed
 - **File Upload Support** - Upload mock files directly from the extension
 - **RESTful API** - Full CRUD operations for rules management
 - **Health Monitoring** - Built-in health check endpoint
@@ -88,9 +88,9 @@ npm run kill
 
 ## Configuration
 
-### Mock Configuration File (`.mocks.json`)
+### Mock Configuration File (`.mocks/config.json`)
 
-The server reads rules from `.mocks.json` in the working directory:
+The server reads rules from `.mocks/config.json` in the working directory:
 
 ```json
 [
@@ -118,7 +118,8 @@ The server reads rules from `.mocks.json` in the working directory:
 http-request-mocker/
 ├── package.json              # Node.js package configuration
 ├── mock-server.js           # Companion Node.js server
-├── .mocks.json             # Server configuration file
+├── .mocks/              # Mock response files and configuration
+│   └── config.json      # Server configuration file
 ├── manifest.json           # Chrome extension config
 ├── background.js          # Extension service worker
 ├── content.js            # Content script (toast notifications)
@@ -301,8 +302,8 @@ Matches:
 ### Server Logs
 ```bash
 [mock-server] Listening on http://localhost:8756
-[mock-server] Config: /path/to/.mocks.json
-[mock-server] Loaded 2 rule(s) from /path/to/.mocks.json
+[mock-server] Config: /path/to/.mocks/config.json
+[mock-server] Loaded 2 rule(s) from /path/to/.mocks/config.json
 [mock-server] ✓ https://api.example.com/users → ./stubs/users.json (application/json)
 [mock-server] Rule added: api.test.com → ./stubs/test.json
 ```
@@ -343,7 +344,7 @@ The extension popup shows real-time activity:
 **Server:**
 1. Modify `mock-server.js`
 2. Restart server: `npm start`
-3. Configuration changes (`.mocks.json`) reload automatically
+3. Configuration changes (`.mocks/config.json`) reload automatically
 
 ### Adding Features
 

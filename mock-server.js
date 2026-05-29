@@ -4,13 +4,15 @@
  *
  * Usage:
  *   cd /path/to/your/project
- *   node /path/to/mock-server.js            # reads .mocks.json from cwd
+ *   node /path/to/mock-server.js            # reads .mocks/config.json from cwd
  *   node /path/to/mock-server.js 9000        # custom port
  *   node /path/to/mock-server.js --config ./my-mocks.json   # custom config path
  *
- * Config format (.mocks.json):
+ * Config format (.mocks/config.json):
  *   [
  *     { "pattern": "https://api.example.com/users", "file": "users.json" },
+ *     { "pattern": "https://api.example.com/dynamic", "handler": "handlers/dynamic.js" },
+ *     { "pattern": "https://api.example.com/modify", "file": "users.json", "handler": "handlers/modify.js" },
  *     { "pattern": "address-book\\.smtnbnxt\\.json", "file": "icon.svg", "isRegex": true }
  *   ]
  *
@@ -19,15 +21,47 @@
  *   - "users.json" resolves to ".mocks/users.json"
  *   - "data/users.json" stays as "data/users.json" (explicit path)
  *   - Absolute paths are used as-is
+ *
+ * Handler functions:
+ *   - "handler": "handlers/dynamic.js" resolves to ".mocks/handlers/dynamic.js"
+ *   - Handlers receive (request, originalResponse) and return response object
+ *   - Hot reloading supported when chokidar is installed (npm install chokidar)
+ *   - Can be combined with file to modify existing response
  */
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// ── Handler caching ─────────────────────────────────────────────────────────
+const handlerCache = new Map();
+
+// Enable hot reload for handlers if chokidar is available
+let chokidarAvailable = false;
+try {
+  const chokidar = require('chokidar');
+  chokidarAvailable = true;
+
+  // Watch handlers directory for changes
+  const handlersPath = path.join('.mocks', 'handlers');
+  if (fs.existsSync(handlersPath)) {
+    chokidar.watch(handlersPath + '/**/*.js').on('change', (filePath) => {
+      console.log(`[mock-server] Handler changed: ${path.relative(process.cwd(), filePath)}`);
+
+      // Clear from cache
+      handlerCache.delete(filePath);
+      delete require.cache[require.resolve(filePath)];
+
+      console.log('[mock-server] Handler reloaded - next request will use updated version');
+    });
+  }
+} catch (err) {
+  // chokidar not installed - that's fine, handlers will still work but won't hot reload
+}
+
 // ── CLI args ────────────────────────────────────────────────────────────────
 let port = 8756;
-let configPath = path.join(process.cwd(), '.mocks.json');
+let configPath = path.join(process.cwd(), '.mocks', 'config.json');
 
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
@@ -67,6 +101,140 @@ try {
   });
 } catch {
   // file might not exist yet — that's fine
+}
+
+// ── Handler loading ─────────────────────────────────────────────────────────
+async function loadHandler(handlerPath) {
+  const fullPath = path.resolve('.mocks', handlerPath);
+
+  try {
+    // Check if handler is cached and file hasn't changed
+    if (handlerCache.has(fullPath)) {
+      const cached = handlerCache.get(fullPath);
+      const stats = fs.statSync(fullPath);
+      if (stats.mtime <= cached.mtime) {
+        return cached.handler;
+      }
+    }
+
+    // Clear from require cache for hot reload
+    delete require.cache[require.resolve(fullPath)];
+
+    // Load handler
+    const handler = require(fullPath);
+    const stats = fs.statSync(fullPath);
+
+    // Validate handler
+    if (typeof handler !== 'function') {
+      throw new Error('Handler must export a function');
+    }
+
+    // Cache with modification time
+    handlerCache.set(fullPath, {
+      handler,
+      mtime: stats.mtime
+    });
+
+    return handler;
+  } catch (error) {
+    console.error(`[mock-server] Error loading handler ${handlerPath}:`, error.message);
+    return null;
+  }
+}
+
+function buildRequestObject(req, url) {
+  return {
+    url,
+    method: req.method,
+    headers: req.headers,
+    body: req.body || null,
+    query: new URL(url).searchParams,
+    timestamp: new Date().toISOString()
+  };
+}
+
+async function resolveWithHandler(targetUrl, rule, req) {
+  let originalResponse = null;
+
+  // Load file response if specified
+  if (rule.file) {
+    const filePath = resolveFilePath(rule.file);
+    if (fs.existsSync(filePath)) {
+      try {
+        const content = fs.readFileSync(filePath);
+        originalResponse = {
+          status: 200,
+          headers: { 'Content-Type': guessMime(filePath) },
+          body: content.toString()
+        };
+      } catch (err) {
+        console.error(`[mock-server] Error reading file ${filePath}:`, err.message);
+        return {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: 'File read error', file: rule.file, detail: err.message })
+        };
+      }
+    }
+  }
+
+  // Apply handler if specified
+  if (rule.handler) {
+    const handler = await loadHandler(rule.handler);
+    if (handler) {
+      try {
+        const requestObj = buildRequestObject(req, targetUrl);
+        const result = await handler(requestObj, originalResponse);
+
+        // Validate handler response
+        if (!result || typeof result !== 'object') {
+          throw new Error('Handler must return a response object');
+        }
+
+        console.log(`[mock-server] ${targetUrl} → ${rule.handler} (handler)`);
+        return result;
+      } catch (err) {
+        console.error(`[mock-server] Handler execution error for ${rule.handler}:`, err.message);
+        return {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: 'Handler execution error', handler: rule.handler, detail: err.message })
+        };
+      }
+    } else {
+      return {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Failed to load handler', handler: rule.handler })
+      };
+    }
+  }
+
+  return originalResponse;
+}
+
+function resolveFilePath(file) {
+  if (path.isAbsolute(file)) {
+    return file;
+  }
+
+  // For relative paths, always try in .mocks/ folder first
+  const mocksRelative = path.join('.mocks', file);
+  const configDir = path.dirname(path.resolve(configPath));
+  const mocksPath = path.join(configDir, mocksRelative);
+
+  if (fs.existsSync(mocksPath)) {
+    return mocksPath;
+  }
+
+  // If not found in .mocks/, try relative to config file directory
+  const configRelative = path.join(configDir, file);
+  if (fs.existsSync(configRelative)) {
+    return configRelative;
+  } else {
+    // Fall back to relative to current working directory in .mocks/
+    return path.resolve(mocksRelative);
+  }
 }
 
 // ── MIME helper ─────────────────────────────────────────────────────────────
@@ -120,22 +288,41 @@ function guessMime(filePath) {
 
 // ── Matching ────────────────────────────────────────────────────────────────
 function findMatch(url) {
+  // First pass: look for exact matches
   for (const rule of rules) {
     try {
       if (rule.isRegex) {
-        if (new RegExp(rule.pattern).test(url)) return rule;
+        if (new RegExp(rule.pattern).test(url)) {
+          return rule;
+        }
       } else {
-        if (url === rule.pattern || url.includes(rule.pattern)) return rule;
+        if (url === rule.pattern) {
+          return rule;
+        }
       }
     } catch {
       // bad regex — skip
     }
   }
+
+  // Second pass: look for substring matches
+  for (const rule of rules) {
+    try {
+      if (!rule.isRegex) {
+        if (url.includes(rule.pattern)) {
+          return rule;
+        }
+      }
+    } catch {
+      // shouldn't happen for non-regex, but just in case
+    }
+  }
+
   return null;
 }
 
 // ── HTTP server ─────────────────────────────────────────────────────────────
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   // CORS — the extension's background SW fetches from here
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -165,42 +352,37 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    // Resolve file path - handle both absolute and relative paths
-    // Relative paths default to .mocks/ folder unless they contain a directory separator
-    let filePath;
-    if (path.isAbsolute(rule.file)) {
-      filePath = rule.file;
-    } else {
-      // If the path doesn't contain a directory separator, default to .mocks/ folder
-      let resolvedFile = rule.file;
-      if (!rule.file.includes('/') && !rule.file.includes('\\')) {
-        resolvedFile = path.join('.mocks', rule.file);
-      }
+    try {
+      // Use handler-aware resolution
+      const result = await resolveWithHandler(targetUrl, rule, req);
 
-      // Try relative to config file directory first
-      const configDir = path.dirname(path.resolve(configPath));
-      const configRelative = path.join(configDir, resolvedFile);
-      if (fs.existsSync(configRelative)) {
-        filePath = configRelative;
-      } else {
-        // Fall back to relative to current working directory
-        filePath = path.resolve(resolvedFile);
-      }
-    }
-
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        console.error(`[mock-server] File read error: ${filePath}`, err.message);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'File read error', file: rule.file, detail: err.message }));
+      if (!result) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'No response generated', url: targetUrl }));
         return;
       }
 
-      const mime = guessMime(filePath);
-      console.log(`[mock-server] ${targetUrl} → ${rule.file}`);
-      res.writeHead(200, { 'Content-Type': mime });
-      res.end(data);
-    });
+      // Send the response
+      const status = result.status || 200;
+      const headers = result.headers || {};
+      const body = result.body || '';
+
+      res.writeHead(status, headers);
+
+      // Handle binary data properly
+      if (typeof body === 'string') {
+        res.end(body);
+      } else if (Buffer.isBuffer(body)) {
+        res.end(body);
+      } else {
+        res.end(String(body));
+      }
+
+    } catch (error) {
+      console.error(`[mock-server] Request processing error:`, error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error', detail: error.message }));
+    }
     return;
   }
 
@@ -222,38 +404,36 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    // Resolve file path - handle both absolute and relative paths
-    // Relative paths default to .mocks/ folder unless they contain a directory separator
-    let filePath;
-    if (path.isAbsolute(rule.file)) {
-      filePath = rule.file;
-    } else {
-      // If the path doesn't contain a directory separator, default to .mocks/ folder
-      let resolvedFile = rule.file;
-      if (!rule.file.includes('/') && !rule.file.includes('\\')) {
-        resolvedFile = path.join('.mocks', rule.file);
-      }
-
-      // Try relative to config file directory first
-      const configDir = path.dirname(path.resolve(configPath));
-      const configRelative = path.join(configDir, resolvedFile);
-      if (fs.existsSync(configRelative)) {
-        filePath = configRelative;
-      } else {
-        // Fall back to relative to current working directory
-        filePath = path.resolve(resolvedFile);
-      }
-    }
-
     try {
-      const data = fs.readFileSync(filePath);
-      const mime = guessMime(filePath);
-      console.log(`[mock-server] ${pattern} → ${rule.file}`);
-      res.writeHead(200, { 'Content-Type': mime });
-      res.end(data);
-    } catch (err) {
+      // Use handler-aware resolution (use pattern as targetUrl for this endpoint)
+      const result = await resolveWithHandler(pattern, rule, req);
+
+      if (!result) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'No response generated', pattern }));
+        return;
+      }
+
+      // Send the response
+      const status = result.status || 200;
+      const headers = result.headers || {};
+      const body = result.body || '';
+
+      res.writeHead(status, headers);
+
+      // Handle binary data properly
+      if (typeof body === 'string') {
+        res.end(body);
+      } else if (Buffer.isBuffer(body)) {
+        res.end(body);
+      } else {
+        res.end(String(body));
+      }
+
+    } catch (error) {
+      console.error(`[mock-server] Request processing error:`, error);
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'File read error', file: rule.file, details: err.message }));
+      res.end(JSON.stringify({ error: 'Internal server error', detail: error.message }));
     }
     return;
   }
@@ -282,6 +462,6 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`[mock-server] Endpoints:`);
   console.log(`  GET /resolve?url=<encoded>       — serve a matched mock`);
   console.log(`  GET /resolve-pattern?pattern=<>  — serve mock by pattern (for declarativeNetRequest)`);
-  console.log(`  GET /rules                       — list current rules from .mocks.json`);
+  console.log(`  GET /rules                       — list current rules from .mocks/config.json`);
   console.log(`  GET /health                  — server status`);
 });

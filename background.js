@@ -25,7 +25,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 /**
- * Update declarativeNetRequest rules based on current .mocks.json
+ * Update declarativeNetRequest rules based on current .mocks/config.json
  */
 async function updateDeclarativeRules() {
   try {

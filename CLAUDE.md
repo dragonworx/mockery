@@ -32,9 +32,14 @@ npm run kill
 4. Reload test pages to see changes
 
 **Refreshing Rules:**
-- Edit `.mocks.json` or add/modify files in `.mocks/` folder
+- Edit `.mocks/config.json` or add/modify files in `.mocks/` folder
 - Click "Refresh Rules" in the extension popup to update both JavaScript and declarativeNetRequest rules
 - Or restart the server to automatically refresh rules on next page load
+
+**Handler Hot Reload:**
+- Install chokidar for automatic handler reloading: `npm run install-hot-reload`
+- Handler files automatically reload when saved (no server restart needed)
+- Check server console for reload notifications
 
 ## Architecture
 
@@ -49,7 +54,7 @@ The extension uses a **hybrid architecture** that intercepts different types of 
 
 2. **HTML Resource Requests** (img tags, CSS, script tags)
    - **declarativeNetRequest API** - intercepts at network layer
-   - **Dynamic Rule Generation** - converts .mocks.json to Chrome rules
+   - **Dynamic Rule Generation** - converts .mocks/config.json to Chrome rules
    - **Redirect to Server** - routes to same Node.js companion server
 
 ### Message Flow Examples
@@ -90,18 +95,28 @@ fetch("https://api.example.com/users")
 Rules are managed through direct file system manipulation:
 
 1. **Create mock files** in the `.mocks/` folder (or subfolders)
-2. **Edit `.mocks.json`** by hand to add URL patterns and file paths
-3. **Server hot-reloads** configuration when `.mocks.json` changes
+2. **Create handler functions** in the `.mocks/handlers/` folder (optional)
+3. **Edit `.mocks/config.json`** by hand to add URL patterns, file paths, and handlers
+4. **Server hot-reloads** configuration when `.mocks/config.json` or handler files change
 
 ### Configuration File
 
-`.mocks.json` format (in project root):
+`.mocks/config.json` format:
 ```json
 [
   {
     "pattern": "https://api.example.com/users",
     "file": "users.json",
     "isRegex": false
+  },
+  {
+    "pattern": "https://api.example.com/dynamic",
+    "handler": "handlers/dynamic-response.js"
+  },
+  {
+    "pattern": "https://api.example.com/enhanced",
+    "file": "users.json",
+    "handler": "handlers/modify-response.js"
   },
   {
     "pattern": ".*\\.example\\.com.*address-book.*",
@@ -111,12 +126,39 @@ Rules are managed through direct file system manipulation:
 ]
 ```
 
+### Handler Functions (New Feature)
+
+Handler functions allow dynamic response generation and modification:
+
+- **File**: `"handlers/dynamic.js"` resolves to `.mocks/handlers/dynamic.js`
+- **Function signature**: `async (request, originalResponse) => responseObject`
+- **Hot reload**: Automatically reloads when handler files change (requires `chokidar`)
+- **Combination**: Can be used with `file` to modify existing responses
+
+**Handler API:**
+```javascript
+// .mocks/handlers/example.js
+module.exports = async (request, originalResponse) => {
+  // request: { url, method, headers, body, query, timestamp }
+  // originalResponse: { status, headers, body } or null
+
+  return {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: 'Dynamic response',
+      timestamp: new Date().toISOString()
+    })
+  };
+};
+```
+
 ### File Path Resolution
 
 Relative paths in rules are resolved as follows:
 - Simple filenames (e.g. `"users.json"`) automatically resolve to `.mocks/users.json`
 - Paths with directories (e.g. `"api/users.json"`) resolve to `.mocks/api/users.json`
-- Paths starting with `./` or `../` are resolved relative to `.mocks.json` location
+- Paths starting with `./` or `../` are resolved relative to `.mocks/config.json` location
 - Absolute paths are used as-is
 
 ### Folder Organization
@@ -124,6 +166,7 @@ Relative paths in rules are resolved as follows:
 The `.mocks/` folder can be organized however you prefer:
 ```
 .mocks/
+├── config.json         # Main configuration file
 ├── api/
 │   ├── users.json
 │   └── auth/
@@ -202,8 +245,48 @@ The extension properly handles binary files (images, PDFs, fonts, archives) by:
 ## Server API Endpoints
 
 - `GET /health` — Server status and rule count
-- `GET /rules` — List all rules from .mocks.json
+- `GET /rules` — List all rules from .mocks/config.json
 - `GET /resolve?url=<encoded>` — Resolve mock for URL (used by extension)
+
+## Testing Handler Functions
+
+The new handler functionality can be tested directly through the mock server endpoints:
+
+### Test Examples with curl
+
+```bash
+# Start the server
+npm start
+
+# Test static file response
+curl "http://localhost:8756/resolve?url=https://api.example.com/users"
+
+# Test file + handler combination (enhanced users with timestamps)
+curl "http://localhost:8756/resolve?url=https://api.example.com/users/enhanced"
+
+# Test search functionality with query parameters
+curl "http://localhost:8756/resolve?url=https://api.example.com/search?q=john&sort=name&limit=1"
+
+# Test purely dynamic handler
+curl "http://localhost:8756/resolve?url=https://api.example.com/dynamic?name=TestUser&count=3"
+
+# Test POST request handling
+curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?name=TestUser"
+```
+
+### Development Workflow
+
+1. **Create/modify handler**: Edit files in `.mocks/handlers/`
+2. **Save changes**: Handler automatically reloads (if chokidar installed)
+3. **Test immediately**: Use curl or refresh browser page
+4. **Check logs**: Server console shows handler execution and errors
+
+### Handler Development Tips
+
+- Use `console.log()` in handlers for debugging - output appears in server console
+- Return detailed error messages during development for easier troubleshooting
+- Test both with and without original file responses
+- Validate handler response format (status, headers, body)
 
 ## Important Notes
 
@@ -235,7 +318,7 @@ The extension properly handles binary files (images, PDFs, fonts, archives) by:
 ├── mock-injector.js       # MAIN-world request interceptor
 ├── popup.html/js/css      # Extension popup UI (simplified, read-only)
 ├── mock-server.js         # Node.js companion server
-├── .mocks.json           # Server configuration (edit by hand)
+├── .mocks/              # Mock response files (organize as needed)
+│   └── config.json      # Server configuration (edit by hand)
 ├── package.json          # Node.js package config
-└── .mocks/              # Mock response files (organize as needed)
 ```
