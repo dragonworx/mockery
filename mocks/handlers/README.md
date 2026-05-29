@@ -101,7 +101,7 @@ module.exports = async (request, originalResponse) => {
 If you have `chokidar` installed (`npm install chokidar`), handlers will automatically reload when you save changes. You'll see this in the server console:
 
 ```
-[mock-server] Handler changed: _mocks/handlers/dynamic-response.js
+[mock-server] Handler changed: mocks/handlers/dynamic-response.js
 [mock-server] Handler reloaded - next request will use updated version
 ```
 

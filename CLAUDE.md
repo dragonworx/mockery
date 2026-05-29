@@ -54,7 +54,7 @@ pkill -f 'node.*mock-server.js'
 4. Reload test pages to see changes
 
 **Refreshing Rules:**
-- Edit `_mocks/config.js` or add/modify files in `_mocks/` folder
+- Edit `mocks/config.js` or add/modify files in `mocks/` folder
 - Click "Refresh Rules" in the extension popup to update both JavaScript and declarativeNetRequest rules
 - Or restart the server to automatically refresh rules on next page load
 
@@ -76,7 +76,7 @@ The extension uses a **hybrid architecture** that intercepts different types of 
 
 2. **HTML Resource Requests** (img tags, CSS, script tags)
    - **declarativeNetRequest API** - intercepts at network layer
-   - **Dynamic Rule Generation** - converts _mocks/config.js to Chrome rules
+   - **Dynamic Rule Generation** - converts mocks/config.js to Chrome rules
    - **Redirect to Server** - routes to same Node.js companion server
 
 ### Message Flow Examples
@@ -116,14 +116,14 @@ fetch("https://api.example.com/users")
 
 Rules are managed through direct file system manipulation:
 
-1. **Create mock files** in the `_mocks/` folder (or subfolders)
-2. **Create handler functions** in the `_mocks/handlers/` folder (optional)
-3. **Edit `_mocks/config.js`** to add URL patterns, file paths, and handlers (inline or imported)
-4. **Server hot-reloads** configuration when `_mocks/config.js` or handler files change
+1. **Create mock files** in the `mocks/` folder (or subfolders)
+2. **Create handler functions** in the `mocks/handlers/` folder (optional)
+3. **Edit `mocks/config.js`** to add URL patterns, file paths, and handlers (inline or imported)
+4. **Server hot-reloads** configuration when `mocks/config.js` or handler files change
 
 ### Configuration File
 
-`_mocks/config.js` format (JavaScript module):
+`mocks/config.js` format (JavaScript module):
 ```javascript
 // HTTP Request Mocker Configuration
 module.exports = [
@@ -203,16 +203,16 @@ module.exports = [
 ### File Path Resolution
 
 Relative paths in rules are resolved as follows:
-- Simple filenames (e.g. `"users.json"`) automatically resolve to `_mocks/users.json`
-- Paths with directories (e.g. `"api/users.json"`) resolve to `_mocks/api/users.json`
-- Paths starting with `./` or `../` are resolved relative to `_mocks/config.js` location
+- Simple filenames (e.g. `"users.json"`) automatically resolve to `mocks/users.json`
+- Paths with directories (e.g. `"api/users.json"`) resolve to `mocks/api/users.json`
+- Paths starting with `./` or `../` are resolved relative to `mocks/config.js` location
 - Absolute paths are used as-is
 
 ### Folder Organization
 
-The `_mocks/` folder can be organized however you prefer:
+The `mocks/` folder can be organized however you prefer:
 ```
-_mocks/
+mocks/
 ├── config.js           # Main configuration file (JavaScript module)
 ├── api/
 │   ├── users.json
@@ -297,7 +297,7 @@ The extension properly handles binary files (images, PDFs, fonts, archives) by:
 ## Server API Endpoints
 
 - `GET /health` — Server status and rule count
-- `GET /rules` — List all rules from _mocks/config.js
+- `GET /rules` — List all rules from mocks/config.js
 - `GET /resolve?url=<encoded>` — Resolve mock for URL (used by extension)
 
 ## Testing Handler Functions
@@ -328,7 +328,7 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 
 ### Development Workflow
 
-1. **Create/modify handler**: Edit files in `_mocks/handlers/`
+1. **Create/modify handler**: Edit files in `mocks/handlers/`
 2. **Save changes**: Handler automatically reloads (if chokidar installed)
 3. **Test immediately**: Use curl or refresh browser page
 4. **Check logs**: Server console shows handler execution and errors
@@ -370,7 +370,7 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 ├── mock-injector.js       # MAIN-world request interceptor
 ├── popup.html/js/css      # Extension popup UI
 ├── mock-server.js         # Node.js companion server (zero dependencies!)
-└── _mocks/               # Mock response files (organize as needed)
+└── mocks/               # Mock response files (organize as needed)
     ├── config.js         # Server configuration (JavaScript module)
     └── handlers/         # JavaScript handler functions
 ```

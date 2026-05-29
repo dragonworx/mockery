@@ -4,11 +4,11 @@
  *
  * Usage:
  *   cd /path/to/your/project
- *   node server/index.js                    # reads _mocks/config.js from cwd
+ *   node server/index.js                    # reads mocks/config.js from cwd
  *   node server/index.js 9000               # custom port
  *   node server/index.js --config ./my-mocks.json   # custom config path
  *
- * Config format (_mocks/config.js):
+ * Config format (mocks/config.js):
  *   module.exports = [
  *     { pattern: "https://api.example.com/users", file: "users.json" },
  *     { pattern: "https://api.example.com/dynamic", handler: async (req) => ({ status: 200, body: "Hi" }) },
@@ -17,13 +17,13 @@
  *   ];
  *
  * File paths:
- *   - Relative paths without directory separators default to _mocks/ folder
- *   - "users.json" resolves to "_mocks/users.json"
+ *   - Relative paths without directory separators default to mocks/ folder
+ *   - "users.json" resolves to "mocks/users.json"
  *   - "data/users.json" stays as "data/users.json" (explicit path)
  *   - Absolute paths are used as-is
  *
  * Handler functions:
- *   - "handler": "handlers/dynamic.js" resolves to "_mocks/handlers/dynamic.js"
+ *   - "handler": "handlers/dynamic.js" resolves to "mocks/handlers/dynamic.js"
  *   - Handlers receive (request, originalResponse) and return response object
  *   - Hot reloading supported when chokidar is installed (npm install chokidar)
  *   - Can be combined with file to modify existing response
@@ -43,7 +43,7 @@ try {
   chokidarAvailable = true;
 
   // Watch handlers directory for changes
-  const handlersPath = path.join('_mocks', 'handlers');
+  const handlersPath = path.join('mocks', 'handlers');
   if (fs.existsSync(handlersPath)) {
     chokidar.watch(handlersPath + '/**/*.js').on('change', (filePath) => {
       console.log(`[mockery] Handler changed: ${path.relative(process.cwd(), filePath)}`);
@@ -61,7 +61,7 @@ try {
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 let port = 8756;
-let configPath = path.join(process.cwd(), '_mocks', 'config.js');
+let configPath = path.join(process.cwd(), 'mocks', 'config.js');
 
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
@@ -69,6 +69,32 @@ for (let i = 2; i < process.argv.length; i++) {
     configPath = path.resolve(process.argv[++i]);
   } else if (/^\d+$/.test(arg)) {
     port = Number(arg);
+  }
+}
+
+// ── Rule overrides persistence ──────────────────────────────────────────────
+const overridesPath = path.join(path.dirname(configPath), '.rule-overrides.json');
+
+function loadOverrides() {
+  try {
+    const raw = fs.readFileSync(overridesPath, 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function saveOverrides(obj) {
+  fs.writeFileSync(overridesPath, JSON.stringify(obj, null, 2));
+}
+
+function applyOverrides() {
+  const overrides = loadOverrides();
+  for (const [index, enabled] of Object.entries(overrides)) {
+    const i = Number(index);
+    if (rules[i]) {
+      rules[i].enabled = enabled;
+    }
   }
 }
 
@@ -97,6 +123,7 @@ function loadConfig() {
     }
 
     rules = loadedRules;
+    applyOverrides();
     console.log(`[mockery] Loaded ${rules.length} rule(s) from ${configPath}`);
   } catch (err) {
     if (err.code === 'ENOENT') {
@@ -141,7 +168,7 @@ async function loadHandler(handlerOrPath) {
   }
 
   // Otherwise, treat it as a file path
-  const fullPath = path.resolve('_mocks', handlerOrPath);
+  const fullPath = path.resolve('mocks', handlerOrPath);
 
   try {
     // Check if handler is cached and file hasn't changed
@@ -257,8 +284,8 @@ function resolveFilePath(file) {
     return file;
   }
 
-  // For relative paths, always try in _mocks/ folder first
-  const mocksRelative = path.join('_mocks', file);
+  // For relative paths, always try in mocks/ folder first
+  const mocksRelative = path.join('mocks', file);
   const configDir = path.dirname(path.resolve(configPath));
   const mocksPath = path.join(configDir, mocksRelative);
 
@@ -266,12 +293,12 @@ function resolveFilePath(file) {
     return mocksPath;
   }
 
-  // If not found in _mocks/, try relative to config file directory
+  // If not found in mocks/, try relative to config file directory
   const configRelative = path.join(configDir, file);
   if (fs.existsSync(configRelative)) {
     return configRelative;
   } else {
-    // Fall back to relative to current working directory in _mocks/
+    // Fall back to relative to current working directory in mocks/
     return path.resolve(mocksRelative);
   }
 }
@@ -375,7 +402,7 @@ function findMatch(url, method) {
 const server = http.createServer(async (req, res) => {
   // CORS — the extension's background SW fetches from here
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
 
   if (req.method === 'OPTIONS') {
@@ -507,8 +534,16 @@ const server = http.createServer(async (req, res) => {
 
   // ── GET /rules — return current rule list ─────────────────────────────
   if (parsed.pathname === '/rules' && req.method === 'GET') {
+    const serialized = rules.map(r => ({
+      pattern: r.pattern,
+      file: r.file || null,
+      isRegex: r.isRegex || false,
+      method: r.method || '*',
+      enabled: r.enabled !== false,
+      hasHandler: typeof r.handler === 'function' || typeof r.handler === 'string',
+    }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(rules));
+    res.end(JSON.stringify(serialized));
     return;
   }
 
@@ -516,6 +551,44 @@ const server = http.createServer(async (req, res) => {
   if (parsed.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, rules: rules.length }));
+    return;
+  }
+
+  // ── POST /rules/:index/toggle — enable/disable a rule ─────────────────
+  const toggleMatch = parsed.pathname.match(/^\/rules\/(\d+)\/toggle$/);
+  if (toggleMatch && req.method === 'POST') {
+    const index = Number(toggleMatch[1]);
+    if (index < 0 || index >= rules.length) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Rule index out of range', index }));
+      return;
+    }
+
+    // Read JSON body
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    let payload;
+    try {
+      payload = JSON.parse(body);
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+      return;
+    }
+
+    const enabled = payload.enabled !== false;
+    rules[index].enabled = enabled;
+
+    // Persist to overrides file
+    const overrides = loadOverrides();
+    overrides[String(index)] = enabled;
+    saveOverrides(overrides);
+
+    // Broadcast so SSE listeners (background.js) pick up the change
+    broadcastConfigChange();
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, index, enabled, pattern: rules[index].pattern }));
     return;
   }
 
@@ -529,7 +602,7 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`[mockery] Endpoints:`);
   console.log(`  GET /resolve?url=<encoded>       — serve a matched mock`);
   console.log(`  GET /resolve-pattern?pattern=<>  — serve mock by pattern (for declarativeNetRequest)`);
-  console.log(`  GET /rules                       — list current rules from _mocks/config.js`);
+  console.log(`  GET /rules                       — list current rules from mocks/config.js`);
   console.log(`  GET /events                      — SSE stream for hot reload`);
   console.log(`  GET /health                      — server status`);
 });

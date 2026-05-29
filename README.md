@@ -60,7 +60,7 @@ That's it. No `npm install`, no build step, no configuration ceremony.
 
 ## Configuration
 
-All mocking rules live in `_mocks/config.js`:
+All mocking rules live in `mocks/config.js`:
 
 ```javascript
 module.exports = [
@@ -101,7 +101,7 @@ module.exports = [
 | Field       | Type                 | Description                                               |
 |-------------|----------------------|-----------------------------------------------------------|
 | `pattern`   | `string`             | URL to match (exact, substring, or regex)                 |
-| `file`      | `string`             | Path to mock file, relative to `_mocks/`                  |
+| `file`      | `string`             | Path to mock file, relative to `mocks/`                  |
 | `handler`   | `function \| string` | Dynamic response generator `(request, originalResponse) => response` |
 | `isRegex`   | `boolean`            | Treat `pattern` as a regular expression                   |
 | `method`    | `string`             | HTTP method filter (`GET`, `POST`, etc.) - defaults to `*` |
@@ -121,7 +121,7 @@ mockery/
 ├── package.json           # npm start convenience
 ├── server/
 │   └── index.js           # Node.js companion server (zero deps)
-└── _mocks/                # Your mock data
+└── mocks/                # Your mock data
     ├── config.js          # Rule definitions
     ├── handlers/          # Dynamic handler functions
     │   └── utils/
@@ -160,7 +160,7 @@ node --watch server/index.js               # Auto-restart on changes (Node 18+)
 Handlers receive a request object and an optional original file response, then return a response object:
 
 ```javascript
-// _mocks/handlers/example.js
+// mocks/handlers/example.js
 module.exports = async (request, originalResponse) => {
   // request: { url, method, headers, body, query, timestamp }
   // originalResponse: { status, headers, body } (if file is also specified)
@@ -181,8 +181,8 @@ Handlers hot-reload automatically when saved (requires `chokidar` for file watch
 
 Mockery supports live reloading without restarting anything:
 
-- **Config changes** (`_mocks/config.js`) - detected via `fs.watch`, broadcast to the extension over SSE
-- **Handler changes** (`_mocks/handlers/**/*.js`) - reloaded on next request (with `chokidar`: instant)
+- **Config changes** (`mocks/config.js`) - detected via `fs.watch`, broadcast to the extension over SSE
+- **Handler changes** (`mocks/handlers/**/*.js`) - reloaded on next request (with `chokidar`: instant)
 - **Mock file changes** - served fresh on every request (no caching)
 
 The extension popup also has a **Refresh Rules** button for manual reloads.

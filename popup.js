@@ -126,7 +126,7 @@ function renderRules(rules) {
   rulesList.innerHTML = '';
 
   if (rules.length === 0) {
-    rulesList.innerHTML = '<div class="empty-state">No rules in _mocks/config.js</div>';
+    rulesList.innerHTML = '<div class="empty-state">No rules in mocks/config.js</div>';
     return;
   }
 
