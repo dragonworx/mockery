@@ -25,7 +25,7 @@
  * Handler functions:
  *   - "handler": "handlers/dynamic.js" resolves to "mocks/handlers/dynamic.js"
  *   - Handlers receive (request, originalResponse) and return response object
- *   - Hot reloading supported when chokidar is installed (npm install chokidar)
+ *   - Hot reloading via built-in fs.watch (no dependencies needed)
  *   - Can be combined with file to modify existing response
  */
 
@@ -36,27 +36,25 @@ const path = require('path');
 // ── Handler caching ─────────────────────────────────────────────────────────
 const handlerCache = new Map();
 
-// Enable hot reload for handlers if chokidar is available
-let chokidarAvailable = false;
-try {
-  const chokidar = require('chokidar');
-  chokidarAvailable = true;
+// Enable hot reload for handlers using built-in fs.watch (recursive supported on macOS/Windows)
+const handlersPath = path.join(process.cwd(), 'mocks', 'handlers');
+if (fs.existsSync(handlersPath)) {
+  try {
+    fs.watch(handlersPath, { recursive: true }, (eventType, filename) => {
+      if (!filename || !filename.endsWith('.js')) return;
+      const filePath = path.join(handlersPath, filename);
 
-  // Watch handlers directory for changes
-  const handlersPath = path.join('mocks', 'handlers');
-  if (fs.existsSync(handlersPath)) {
-    chokidar.watch(handlersPath + '/**/*.js').on('change', (filePath) => {
-      console.log(`[mockery] Handler changed: ${path.relative(process.cwd(), filePath)}`);
+      console.log(`[mockery] Handler changed: mocks/handlers/${filename}`);
 
       // Clear from cache
       handlerCache.delete(filePath);
-      delete require.cache[require.resolve(filePath)];
+      try { delete require.cache[require.resolve(filePath)]; } catch {}
 
       console.log('[mockery] Handler reloaded - next request will use updated version');
     });
+  } catch {
+    // fs.watch recursive not supported on this platform — handlers won't hot reload
   }
-} catch (err) {
-  // chokidar not installed - that's fine, handlers will still work but won't hot reload
 }
 
 // ── CLI args ────────────────────────────────────────────────────────────────

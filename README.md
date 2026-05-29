@@ -13,21 +13,21 @@ Mockery uses a hybrid interception architecture to cover every type of browser r
  ┌─────────────────────────────────────────────────────────┐
  │                                                         │
  │   MAIN World              ISOLATED World                │
- │  ┌──────────────┐       ┌────────────────┐             │
- │  │mock-injector │◄─────►│ content-bridge │             │
- │  │              │  msg   │                │             │
- │  │ patches:     │       └───────┬────────┘             │
- │  │  • fetch()   │               │ chrome.runtime       │
- │  │  • XHR       │               ▼                      │
- │  └──────────────┘       ┌────────────────┐             │
- │                         │  background.js │             │
- │  declarativeNetRequest  │  service worker│             │
- │  ┌──────────────┐      └───────┬────────┘             │
- │  │ intercepts:  │               │                      │
- │  │  • <img>     │               │ fetch()              │
- │  │  • <link>    │               ▼                      │
- │  │  • <script>  ├──────► localhost:8756                │
- │  └──────────────┘        (Node.js server)              │
+ │  ┌──────────────┐       ┌────────────────┐              │
+ │  │   injector   │◄─────►│     bridge     │              │
+ │  │              │  msg  │                │              │
+ │  │ patches:     │       └───────┬────────┘              │
+ │  │  • fetch()   │               │ chrome.runtime        │
+ │  │  • XHR       │               ▼                       │
+ │  └──────────────┘       ┌────────────────┐              │
+ │                         │  background.js │              │
+ │  declarativeNetRequest  │  service worker│              │
+ │  ┌──────────────┐       └──────┬─────────┘              │
+ │  │ intercepts:  │              │                        │
+ │  │  • <img>     │              │ fetch()                │
+ │  │  • <link>    │              ▼                        │
+ │  │  • <script>  ├──────► localhost:8756                 │
+ │  └──────────────┘        (Node.js server)               │
  └─────────────────────────────────────────────────────────┘
 ```
 
@@ -151,7 +151,7 @@ module.exports = async (request, originalResponse) => {
 };
 ```
 
-Handlers hot-reload automatically when saved (requires `chokidar` for file watching, otherwise restart the server).
+Handlers hot-reload automatically when saved (uses built-in `fs.watch` — no dependencies needed).
 
 ---
 
@@ -160,7 +160,7 @@ Handlers hot-reload automatically when saved (requires `chokidar` for file watch
 Mockery supports live reloading without restarting anything:
 
 - **Config changes** (`mocks/config.js`) - detected via `fs.watch`, broadcast to the extension over SSE
-- **Handler changes** (`mocks/handlers/**/*.js`) - reloaded on next request (with `chokidar`: instant)
+- **Handler changes** (`mocks/handlers/**/*.js`) - detected via `fs.watch`, reloaded instantly
 - **Mock file changes** - served fresh on every request (no caching)
 
 The extension popup also has a **Refresh Rules** button for manual reloads.

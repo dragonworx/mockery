@@ -59,8 +59,7 @@ pkill -f 'node.*mock-server.js'
 - Or restart the server to automatically refresh rules on next page load
 
 **Handler Hot Reload:**
-- Install chokidar for automatic handler reloading: `npm install chokidar` (optional)
-- Handler files automatically reload when saved (no server restart needed)
+- Handler files automatically reload when saved (no server restart needed, uses built-in `fs.watch`)
 - Check server console for reload notifications
 
 ## Architecture
@@ -329,7 +328,7 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 ### Development Workflow
 
 1. **Create/modify handler**: Edit files in `mocks/handlers/`
-2. **Save changes**: Handler automatically reloads (if chokidar installed)
+2. **Save changes**: Handler automatically reloads (via built-in fs.watch)
 3. **Test immediately**: Use curl or refresh browser page
 4. **Check logs**: Server console shows handler execution and errors
 

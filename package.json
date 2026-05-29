@@ -5,8 +5,7 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "kill": "pkill -f 'node.*server/index.js' || true",
-    "install-hot-reload": "npm install chokidar --save-optional"
+    "kill": "pkill -f 'node.*server/index.js' || true"
   },
   "keywords": [
     "chrome-extension",
@@ -20,8 +19,5 @@
   "license": "ISC",
   "engines": {
     "node": ">=12.0.0"
-  },
-  "optionalDependencies": {
-    "chokidar": "^3.5.3"
   }
 }
