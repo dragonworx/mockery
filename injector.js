@@ -112,29 +112,48 @@
     // Wait for rules to be loaded before deciding
     await rulesLoaded;
 
-    // DEBUG: unconditional log to diagnose matching
+    // Diagnostic log for address-book URLs
     if (url.includes('address-book')) {
-      console.log(`[Mockery DEBUG] fetch intercepted: ${method} ${url}`);
-      console.log(`[Mockery DEBUG] enabled=${enabled}, rules.length=${rules.length}`);
-      rules.forEach((r, i) => console.log(`[Mockery DEBUG] rule[${i}]: method=${r.method}, pattern=${r.pattern.substring(0, 60)}...`));
+      console.log(`%c[Mockery]%c fetch intercepted: ${method} %c${url}`, 'color:#8b5cf6;font-weight:bold', 'color:inherit;font-weight:bold', 'color:#06b6d4');
+      console.log(`%c[Mockery]%c enabled=%c${enabled}%c, rules.length=%c${rules.length}`, 'color:#8b5cf6;font-weight:bold', 'color:inherit', 'color:#f59e0b;font-weight:bold', 'color:inherit', 'color:#f59e0b;font-weight:bold');
+      rules.forEach((r, i) => console.log(`%c[Mockery]%c rule[${i}]: method=%c${r.method}%c, pattern=%c${r.pattern.substring(0, 60)}…`, 'color:#8b5cf6;font-weight:bold', 'color:inherit', 'color:#10b981', 'color:inherit', 'color:#06b6d4'));
     }
 
     const rule = findMatch(url, method);
 
     if (rule) {
       if (enableLogging) {
-        console.log(`[Mockery] Rule matched for ${method} ${url}, requesting mock…`);
+        console.log(`%c[Mockery]%c ${method} %c${url}%c — %crule matched%c, requesting mock…`, 'color:#8b5cf6;font-weight:bold', 'color:inherit;font-weight:bold', 'color:#06b6d4', 'color:inherit', 'color:#10b981;font-weight:bold', 'color:inherit');
       }
-      const mock = await requestMock(url, method);
+      // Fetch mock and original response in parallel
+      const [mock, originalRes] = await Promise.all([
+        requestMock(url, method),
+        originalFetch.apply(this, arguments).catch(() => null),
+      ]);
 
       if (mock) {
         if (enableLogging) {
-          let parsed;
-          try { parsed = JSON.parse(mock.body); } catch { parsed = mock.body; }
-          console.groupCollapsed(`[Mockery] fetch → ${rule.file || 'handler'}`);
-          console.log('url ', url);
-          console.log('mime', mock.mime);
-          console.log('body', parsed);
+          let parsedMock;
+          try { parsedMock = JSON.parse(mock.body); } catch { parsedMock = mock.body; }
+
+          let parsedOriginal = null;
+          if (originalRes) {
+            try {
+              const cloned = originalRes.clone();
+              const text = await cloned.text();
+              try { parsedOriginal = JSON.parse(text); } catch { parsedOriginal = text; }
+            } catch { /* ignore */ }
+          }
+
+          console.groupCollapsed(
+            `%c[Mockery]%c ${method} %c${url}%c → %c${rule.file || 'handler'}`,
+            'color:#8b5cf6;font-weight:bold', 'color:inherit;font-weight:bold',
+            'color:#06b6d4', 'color:inherit',
+            'color:#10b981;font-weight:bold'
+          );
+          console.log('%crequest  %o', 'color:#64748b;font-weight:bold', { method, url, headers: init?.headers || {}, body: init?.body });
+          console.log('%coriginal %o', 'color:#f59e0b;font-weight:bold', originalRes ? { status: originalRes.status, body: parsedOriginal } : '(failed or unavailable)');
+          console.log('%cmocked   %o', 'color:#10b981;font-weight:bold', { status: 200, mime: mock.mime, body: parsedMock });
           console.groupEnd();
         }
 
@@ -158,7 +177,7 @@
           headers: { 'Content-Type': mock.mime },
         });
       } else if (enableLogging) {
-        console.warn(`[Mockery] Mock response was null for ${method} ${url} — falling through to network`);
+        console.warn(`%c[Mockery]%c ${method} %c${url}%c — mock was null, falling through to network`, 'color:#8b5cf6;font-weight:bold', 'color:inherit;font-weight:bold', 'color:#06b6d4', 'color:#f59e0b');
       }
     }
 
@@ -191,20 +210,37 @@
         return;
       }
 
-      requestMock(url, xhr.__mockMethod || 'GET').then((mock) => {
+      const xhrMethod = xhr.__mockMethod || 'GET';
+      Promise.all([
+        requestMock(url, xhrMethod),
+        // Fire the original request in parallel to capture the original response for logging
+        enableLogging
+          ? originalFetch(url, { method: xhrMethod, body: body, headers: {} }).then(r => r.text().then(t => ({ status: r.status, body: t }))).catch(() => null)
+          : Promise.resolve(null),
+      ]).then(([mock, originalRes]) => {
       if (!mock) {
         // Fallback to real network
         origSend.call(xhr, body);
         return;
       }
 
-      let parsed;
-      try { parsed = JSON.parse(mock.body); } catch { parsed = mock.body; }
+      let parsedMock;
+      try { parsedMock = JSON.parse(mock.body); } catch { parsedMock = mock.body; }
       if (enableLogging) {
-        console.groupCollapsed(`[Mockery] XHR → ${rule.file}`);
-        console.log('url ', url);
-        console.log('mime', mock.mime);
-        console.log('body', parsed);
+        let parsedOriginal = null;
+        if (originalRes) {
+          try { parsedOriginal = JSON.parse(originalRes.body); } catch { parsedOriginal = originalRes.body; }
+        }
+
+        console.groupCollapsed(
+          `%c[Mockery]%c ${xhrMethod} %c${url}%c → %c${rule.file || 'handler'}`,
+          'color:#8b5cf6;font-weight:bold', 'color:inherit;font-weight:bold',
+          'color:#06b6d4', 'color:inherit',
+          'color:#10b981;font-weight:bold'
+        );
+        console.log('%crequest  %o', 'color:#64748b;font-weight:bold', { method: xhrMethod, url, body });
+        console.log('%coriginal %o', 'color:#f59e0b;font-weight:bold', originalRes ? { status: originalRes.status, body: parsedOriginal } : '(failed or unavailable)');
+        console.log('%cmocked   %o', 'color:#10b981;font-weight:bold', { status: 200, mime: mock.mime, body: parsedMock });
         console.groupEnd();
       }
 
@@ -270,5 +306,5 @@
     });
   };
 
-  console.log('[Mockery] Injector ready');
+  console.log('%c[Mockery]%c Injector ready', 'color:#8b5cf6;font-weight:bold', 'color:inherit');
 })();
