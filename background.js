@@ -1,7 +1,7 @@
 /**
- * Background Service Worker for HTTP Request Mocker
+ * Background Service Worker for Mockery
  * Bridges RESOLVE_MOCK messages from the content script to the local Node
- * companion server (http://localhost:8765 by default).
+ * companion server (http://localhost:8756 by default).
  * Also manages declarativeNetRequest rules for HTML resource interception.
  */
 
@@ -11,7 +11,7 @@ const DEFAULT_SERVER = 'http://localhost:8756';
  * Initialize extension on install
  */
 chrome.runtime.onInstalled.addListener(async () => {
-  console.log('[HTTP Mocker] Extension installed');
+  console.log('[Mockery] Extension installed');
   const storage = await chrome.storage.local.get(['enabled', 'serverUrl']);
   if (storage.enabled === undefined) {
     await chrome.storage.local.set({ enabled: true });
@@ -25,7 +25,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 /**
- * Update declarativeNetRequest rules based on current .mocks/config.js
+ * Update declarativeNetRequest rules based on current _mocks/config.js
  */
 async function updateDeclarativeRules() {
   try {
@@ -43,7 +43,7 @@ async function updateDeclarativeRules() {
     // Fetch rules from Node server
     const resp = await fetch(`${base}/rules`);
     if (!resp.ok) {
-      console.warn('[HTTP Mocker] Could not fetch rules for declarativeNetRequest:', resp.status);
+      console.warn('[Mockery] Could not fetch rules for declarativeNetRequest:', resp.status);
       return;
     }
 
@@ -65,6 +65,9 @@ async function updateDeclarativeRules() {
         condition: {}
       };
 
+      // Skip disabled rules
+      if (rule.enabled === false) continue;
+
       // Skip non-GET rules — declarativeNetRequest only handles resource loads (always GET)
       const ruleMethod = (rule.method || '*').toUpperCase();
       if (ruleMethod !== '*' && ruleMethod !== 'GET') {
@@ -76,7 +79,7 @@ async function updateDeclarativeRules() {
       let urlFilter;
       if (rule.isRegex) {
         // Skip regex rules for declarativeNetRequest due to complexity
-        console.warn('[HTTP Mocker] Skipping regex rule for declarativeNetRequest:', rule.pattern);
+        console.warn('[Mockery] Skipping regex rule for declarativeNetRequest:', rule.pattern);
         continue;
       } else {
         if (rule.pattern.startsWith('http')) {
@@ -117,10 +120,10 @@ async function updateDeclarativeRules() {
       addRules: declarativeRules
     });
 
-    console.log(`[HTTP Mocker] Updated declarativeNetRequest rules: ${declarativeRules.length} active`);
+    console.log(`[Mockery] Updated declarativeNetRequest rules: ${declarativeRules.length} active`);
 
   } catch (err) {
-    console.error('[HTTP Mocker] Error updating declarativeNetRequest rules:', err);
+    console.error('[Mockery] Error updating declarativeNetRequest rules:', err);
   }
 }
 
@@ -166,7 +169,7 @@ function connectSSE() {
                 try {
                   const event = JSON.parse(line.slice(6));
                   if (event.type === 'config-changed') {
-                    console.log('[HTTP Mocker] Config changed, notifying tabs…');
+                    console.log('[Mockery] Config changed, notifying tabs…');
                     notifyAllTabs();
                     updateDeclarativeRules();
                   }
@@ -283,7 +286,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       sendResponse({ body, mime, isBinary });
     } catch (err) {
-      console.error('[HTTP Mocker] Error resolving mock:', err);
+      console.error('[Mockery] Error resolving mock:', err);
       sendResponse({ error: err.message });
     }
   })();

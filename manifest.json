@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "HTTP Request Mocker",
+  "name": "Mockery",
   "version": "2.0.0",
-  "description": "Intercept HTTP requests and return mock responses from a local Node companion server",
+  "description": "Intercept HTTP requests and return mock responses from a local Node.js companion server",
   "permissions": [
     "storage",
     "declarativeNetRequest",
@@ -38,19 +38,19 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content-bridge.js"],
+      "js": ["bridge.js"],
       "run_at": "document_start"
     },
     {
       "matches": ["<all_urls>"],
-      "js": ["mock-injector.js"],
+      "js": ["injector.js"],
       "run_at": "document_start",
       "world": "MAIN"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["mock-injector.js"],
+      "resources": ["injector.js"],
       "matches": ["<all_urls>"]
     }
   ]

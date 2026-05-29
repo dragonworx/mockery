@@ -1,5 +1,5 @@
 /**
- * Popup UI Logic for HTTP Request Mocker
+ * Popup UI Logic for Mockery
  * Connects to the companion Node mock server.
  */
 
@@ -96,7 +96,7 @@ async function checkServer() {
   } catch {}
 
   serverStatus.className = 'status-dot offline';
-  serverHint.innerHTML = 'Server offline — run <code>node mock-server.js</code>';
+  serverHint.innerHTML = 'Server offline — run <code>npm start</code>';
   serverHint.style.color = '#888';
   rulesList.innerHTML = '<div class="empty-state">Cannot reach mock server.</div>';
   ruleCount.textContent = '0';
@@ -126,7 +126,7 @@ function renderRules(rules) {
   rulesList.innerHTML = '';
 
   if (rules.length === 0) {
-    rulesList.innerHTML = '<div class="empty-state">No rules in .mocks/config.js</div>';
+    rulesList.innerHTML = '<div class="empty-state">No rules in _mocks/config.js</div>';
     return;
   }
 

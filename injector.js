@@ -9,14 +9,18 @@
   'use strict';
 
   // Avoid double-injection
-  if (window.__httpMockerInjected) return;
-  window.__httpMockerInjected = true;
+  if (window.__mockeryInjected) return;
+  window.__mockeryInjected = true;
 
-  const CHANNEL = '__HTTP_MOCKER__';
+  const CHANNEL = '__MOCKERY__';
   let enabled = true;
   let rules = [];
   let showNotifications = true;
   let enableLogging = true;
+
+  // ── Wait for initial rules before intercepting ─────────────────────────
+  let _rulesReady;
+  const rulesLoaded = new Promise((resolve) => { _rulesReady = resolve; });
 
   // ── Rule cache — pushed from the ISOLATED world ───────────────────────
   window.addEventListener('message', (event) => {
@@ -30,11 +34,15 @@
       enabled = msg.enabled;
       showNotifications = msg.showNotifications !== false; // Default to true
       enableLogging = msg.enableLogging !== false;       // Default to true
+      _rulesReady(); // Signal that rules have arrived
     }
   });
 
   // Request rules on load
   window.postMessage({ channel: CHANNEL, type: 'REQUEST_RULES' }, '*');
+
+  // Timeout: don't block requests forever if rules never arrive
+  setTimeout(() => _rulesReady(), 2000);
 
   // ── Matching ──────────────────────────────────────────────────────────
   function findMatch(url, method) {
@@ -43,6 +51,7 @@
 
     for (const rule of rules) {
       try {
+        if (rule.enabled === false) continue;
         const ruleMethod = (rule.method || '*').toUpperCase();
         if (ruleMethod !== '*' && ruleMethod !== normalizedMethod) continue;
         if (rule.isRegex) {
@@ -94,19 +103,35 @@
   const originalFetch = window.fetch;
 
   window.fetch = async function (input, init) {
-    const url = (typeof input === 'string') ? input : (input instanceof Request ? input.url : String(input));
+    const rawUrl = (typeof input === 'string') ? input : (input instanceof Request ? input.url : String(input));
+    // Resolve relative URLs to absolute so patterns can match full URLs
+    let url;
+    try { url = new URL(rawUrl, document.baseURI).href; } catch { url = rawUrl; }
     const method = (init && init.method) ? init.method.toUpperCase() : (input instanceof Request ? input.method.toUpperCase() : 'GET');
+
+    // Wait for rules to be loaded before deciding
+    await rulesLoaded;
+
+    // DEBUG: unconditional log to diagnose matching
+    if (url.includes('address-book')) {
+      console.log(`[Mockery DEBUG] fetch intercepted: ${method} ${url}`);
+      console.log(`[Mockery DEBUG] enabled=${enabled}, rules.length=${rules.length}`);
+      rules.forEach((r, i) => console.log(`[Mockery DEBUG] rule[${i}]: method=${r.method}, pattern=${r.pattern.substring(0, 60)}...`));
+    }
 
     const rule = findMatch(url, method);
 
     if (rule) {
+      if (enableLogging) {
+        console.log(`[Mockery] Rule matched for ${method} ${url}, requesting mock…`);
+      }
       const mock = await requestMock(url, method);
 
       if (mock) {
         if (enableLogging) {
           let parsed;
           try { parsed = JSON.parse(mock.body); } catch { parsed = mock.body; }
-          console.groupCollapsed(`[HTTP Mocker] fetch → ${rule.file || 'handler'}`);
+          console.groupCollapsed(`[Mockery] fetch → ${rule.file || 'handler'}`);
           console.log('url ', url);
           console.log('mime', mock.mime);
           console.log('body', parsed);
@@ -132,6 +157,8 @@
           statusText: 'OK (mocked)',
           headers: { 'Content-Type': mock.mime },
         });
+      } else if (enableLogging) {
+        console.warn(`[Mockery] Mock response was null for ${method} ${url} — falling through to network`);
       }
     }
 
@@ -144,23 +171,27 @@
   const origSend = XHR.prototype.send;
 
   XHR.prototype.open = function (method, url, ...rest) {
-    this.__mockUrl = (typeof url === 'string') ? url : String(url);
+    const rawUrl = (typeof url === 'string') ? url : String(url);
+    // Resolve relative URLs to absolute so patterns can match full URLs
+    try { this.__mockUrl = new URL(rawUrl, document.baseURI).href; } catch { this.__mockUrl = rawUrl; }
     this.__mockMethod = (typeof method === 'string') ? method.toUpperCase() : 'GET';
-    this.__mockRule = findMatch(this.__mockUrl, this.__mockMethod);
     return origOpen.call(this, method, url, ...rest);
   };
 
   XHR.prototype.send = function (body) {
-    const rule = this.__mockRule;
-
-    if (!rule) {
-      return origSend.call(this, body);
-    }
-
     const xhr = this;
     const url = xhr.__mockUrl;
 
-    requestMock(url, xhr.__mockMethod || 'GET').then((mock) => {
+    // Wait for rules before deciding to intercept
+    rulesLoaded.then(() => {
+      const rule = findMatch(url, xhr.__mockMethod || 'GET');
+
+      if (!rule) {
+        origSend.call(xhr, body);
+        return;
+      }
+
+      requestMock(url, xhr.__mockMethod || 'GET').then((mock) => {
       if (!mock) {
         // Fallback to real network
         origSend.call(xhr, body);
@@ -170,7 +201,7 @@
       let parsed;
       try { parsed = JSON.parse(mock.body); } catch { parsed = mock.body; }
       if (enableLogging) {
-        console.groupCollapsed(`[HTTP Mocker] XHR → ${rule.file}`);
+        console.groupCollapsed(`[Mockery] XHR → ${rule.file}`);
         console.log('url ', url);
         console.log('mime', mock.mime);
         console.log('body', parsed);
@@ -235,8 +266,9 @@
       const loadEndEvent = new ProgressEvent('loadend');
       xhr.dispatchEvent(loadEndEvent);
       if (typeof xhr.onloadend === 'function') xhr.onloadend(loadEndEvent);
+      });
     });
   };
 
-  console.log('[HTTP Mocker] Injector ready');
+  console.log('[Mockery] Injector ready');
 })();

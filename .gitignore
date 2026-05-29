@@ -1,1 +1,4 @@
 .claude
+.DS_Store
+_metadata/
+node_modules/

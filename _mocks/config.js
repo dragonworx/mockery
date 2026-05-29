@@ -1,4 +1,4 @@
-// HTTP Request Mocker Configuration
+// Mockery Configuration
 // This file defines URL patterns and their corresponding mock responses
 
 module.exports = [
@@ -15,7 +15,7 @@ module.exports = [
         status: 200,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          _note: "This response was intercepted and modified by HTTP Request Mocker",
+          _note: "This response was intercepted and modified by Mockery",
           requestId: "mock-" + Date.now() + "-eb3a650cdadd4c6c",
           handle: [
             {
@@ -56,5 +56,12 @@ module.exports = [
       };
     },
     comment: "Intercept Adobe interact - placeholder proving interception works"
+  },
+  {
+    pattern: "http://localhost:8080/banking/payments/payment-settings/dhp/retail/netbank/core/banking/payments/payment-settings/address-book.smtnbnxt.json",
+    method: "GET",
+    file: "aem/test.json",
+    isRegex: false,
+    enabled: false,
   }
 ];

@@ -1,384 +1,241 @@
-# HTTP Request Mocker - Chrome Extension with Node.js Server
+# Mockery
 
-A comprehensive Chrome extension with companion Node.js server for intercepting HTTP requests and returning mock responses. Perfect for frontend development, testing, and API simulation without modifying backend services.
-
-## Features
-
-### Chrome Extension
-- **Manifest V3** - Modern Chrome extension architecture
-- **Advanced Request Interception** - Patches `fetch()` and `XMLHttpRequest` in the page context
-- **Live Toast Notifications** - Visual feedback when requests are intercepted
-- **Real-time Activity Tracking** - Monitor intercepted requests in the popup
-- **Persistent Storage** - Rules and configuration persist across sessions
-- **Enable/Disable Toggle** - Quick on/off control
-- **Server Connection Status** - Visual indicator of server connectivity
-
-### Node.js Companion Server
-- **Zero Dependencies** - Pure Node.js server with no external packages
-- **Hot Configuration Reload** - Automatically reloads `.mocks/config.json` when changed
-- **File Upload Support** - Upload mock files directly from the extension
-- **RESTful API** - Full CRUD operations for rules management
-- **Health Monitoring** - Built-in health check endpoint
-- **Flexible Matching** - Supports both exact string and regex pattern matching
-- **MIME Type Detection** - Automatic content-type headers based on file extension
-- **CORS Enabled** - Configured for extension communication
-
-## Installation
-
-### Chrome Extension
-
-1. Clone or download this repository
-2. Open Chrome and navigate to `chrome://extensions/`
-3. Enable "Developer mode" (toggle in top-right corner)
-4. Click "Load unpacked"
-5. Select the extension directory (containing `manifest.json`)
-
-### Node.js Server
-
-1. Navigate to the project directory
-2. Start the server:
-   ```bash
-   npm start
-   # or
-   node mock-server.js
-   ```
-3. Server runs on `http://localhost:8756` by default
-
-**Custom Configuration:**
-```bash
-# Custom port
-node mock-server.js 9000
-
-# Custom config file
-node mock-server.js --config ./my-mocks.json
-
-# Both
-node mock-server.js 9000 --config ./my-mocks.json
-```
-
-## Quick Start
-
-### 1. Start the Server
-```bash
-npm start
-```
-
-To stop the server:
-```bash
-npm run kill
-```
-
-### 2. Configure the Extension
-1. Click the extension icon in Chrome
-2. Verify server connection (green dot = connected)
-3. If offline, check the server URL (default: `http://localhost:8756`)
-
-### 3. Add Your First Mock
-1. In the extension popup, click "Choose file..."
-2. Upload a JSON file with your mock response
-3. Enter a URL pattern to match (e.g., `api.example.com/users`)
-4. Check "Regex" if using regex patterns
-5. Click "Add Rule"
-
-### 4. Test It
-1. Enable mocking with the toggle switch
-2. Navigate to a page that makes the matching request
-3. See the toast notification confirming interception
-4. Check the "Activity" tab for intercepted requests
-
-## Configuration
-
-### Mock Configuration File (`.mocks/config.json`)
-
-The server reads rules from `.mocks/config.json` in the working directory:
-
-```json
-[
-  {
-    "pattern": "https://api.example.com/users",
-    "file": "./stubs/users.json",
-    "isRegex": false
-  },
-  {
-    "pattern": ".*\\.commbank\\.com\\.au.*address-book\\.json.*",
-    "file": "./stubs/address-book.json",
-    "isRegex": true
-  }
-]
-```
-
-**Fields:**
-- `pattern` - URL pattern to match (string or regex)
-- `file` - Path to mock file relative to config file location
-- `isRegex` - Boolean indicating if pattern is a regex (optional, default: false)
-
-### File Structure
-
-```
-http-request-mocker/
-├── package.json              # Node.js package configuration
-├── mock-server.js           # Companion Node.js server
-├── .mocks/              # Mock response files and configuration
-│   └── config.json      # Server configuration file
-├── manifest.json           # Chrome extension config
-├── background.js          # Extension service worker
-├── content.js            # Content script (toast notifications)
-├── content-bridge.js     # Bridge between content scripts
-├── mock-injector.js     # Main-world script (request interception)
-├── popup.html           # Extension popup UI
-├── popup.js            # Popup logic and server communication
-├── popup.css          # Popup styling
-├── icons/            # Extension icons
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
-├── .mocks/          # Example mock files
-│   ├── address-book.json
-│   ├── users-list.json
-│   ├── auth-login.json
-│   └── error-404.json
-```
-
-## Usage Examples
-
-### Example 1: Banking API Mock
-
-**Mock File (`.mocks/address-book.json`):**
-```json
-{
-  "addressBook": [
-    {
-      "id": "123",
-      "nickname": "John's Account",
-      "bsb": "062-001",
-      "accountNumber": "12345678"
-    }
-  ]
-}
-```
-
-**Rule Configuration:**
-```json
-{
-  "pattern": ".*commbank.com.au.*address-book.*json.*",
-  "file": "address-book.json",
-  "isRegex": true
-}
-```
-
-### Example 2: User Authentication
-
-**Mock File (`.mocks/login-success.json`):**
-```json
-{
-  "success": true,
-  "user": {
-    "id": 12345,
-    "username": "testuser",
-    "token": "mock-jwt-token-here"
-  }
-}
-```
-
-**Rule Configuration:**
-```json
-{
-  "pattern": "https://api.myapp.com/auth/login",
-  "file": "login-success.json",
-  "isRegex": false
-}
-```
-
-### Example 3: API Error Simulation
-
-**Mock File (`.mocks/404-error.json`):**
-```json
-{
-  "error": {
-    "code": 404,
-    "message": "User not found",
-    "details": "The requested user ID does not exist"
-  }
-}
-```
-
-**Rule Configuration:**
-```json
-{
-  "pattern": "api/users/999",
-  "file": "404-error.json",
-  "isRegex": false
-}
-```
-
-## Server API Endpoints
-
-### GET `/health`
-Check server status and rule count
-```bash
-curl http://localhost:8756/health
-# Response: {"ok": true, "rules": 3}
-```
-
-### GET `/rules`
-List all current rules
-```bash
-curl http://localhost:8756/rules
-```
-
-### POST `/rules`
-Add a new rule
-```bash
-curl -X POST http://localhost:8756/rules \
-  -H "Content-Type: application/json" \
-  -d '{"pattern": "api.test.com", "file": "./stubs/test.json"}'
-```
-
-### DELETE `/rules`
-Remove a rule by pattern
-```bash
-curl -X DELETE http://localhost:8756/rules \
-  -H "Content-Type: application/json" \
-  -d '{"pattern": "api.test.com"}'
-```
-
-### POST `/upload`
-Upload a mock file
-```bash
-curl -X POST http://localhost:8756/upload \
-  -H "Content-Type: application/json" \
-  -d '{"filename": "test.json", "content": "{\"test\": true}"}'
-# Response: {"ok": true, "file": "./stubs/test.json"}
-```
-
-### GET `/resolve?url=<encoded_url>`
-Resolve a mock for a specific URL (used by extension)
-```bash
-curl "http://localhost:8756/resolve?url=https%3A//api.test.com/users"
-```
-
-## Pattern Matching
-
-### Exact String Matching
-```json
-{
-  "pattern": "https://api.example.com/users",
-  "file": "./stubs/users.json",
-  "isRegex": false
-}
-```
-Matches:
-- `https://api.example.com/users` (exact)
-- `https://api.example.com/users?page=1` (contains)
-
-### Regex Matching
-```json
-{
-  "pattern": ".*api\\.example\\.com.*users.*",
-  "file": "./stubs/users.json",
-  "isRegex": true
-}
-```
-Matches:
-- `https://api.example.com/v1/users`
-- `https://beta.api.example.com/users?filter=active`
-
-**Common Regex Patterns:**
-
-| Pattern | Description | Matches |
-|---------|-------------|---------|
-| `.*api\.example\.com.*` | Any request to api.example.com | `https://api.example.com/anything` |
-| `.*\.json$` | URLs ending in .json | `https://site.com/data.json` |
-| `^https://staging\..*` | URLs starting with staging | `https://staging.myapp.com/api` |
-| `.*user/\d+/profile.*` | User profile endpoints | `https://api.com/user/123/profile` |
-
-## Debugging
-
-### Extension Console Logs
-1. Open Chrome DevTools (F12)
-2. Check Console for `[HTTP Mocker]` messages
-3. View Service Worker logs at `chrome://extensions/`
-
-### Server Logs
-```bash
-[mock-server] Listening on http://localhost:8756
-[mock-server] Config: /path/to/.mocks/config.json
-[mock-server] Loaded 2 rule(s) from /path/to/.mocks/config.json
-[mock-server] ✓ https://api.example.com/users → ./stubs/users.json (application/json)
-[mock-server] Rule added: api.test.com → ./stubs/test.json
-```
-
-### Activity Monitoring
-The extension popup shows real-time activity:
-- **Activity Tab**: Recently intercepted requests with timestamps
-- **Rules Tab**: Current server rules with pattern/file mappings
-- **Status Indicator**: Server connection status
-
-### Troubleshooting
-
-**Server connection issues:**
-- Verify server is running: `curl http://localhost:8756/health`
-- Check firewall/antivirus blocking port 8756
-- Ensure no other service is using port 8756
-
-**Rules not matching:**
-- Test regex patterns in browser console: `new RegExp('your-pattern').test('actual-url')`
-- Check for typos in patterns or file paths
-- Verify mock files exist in the specified location
-
-**File upload failures:**
-- Ensure valid JSON format
-- Check file permissions in stubs directory
-- Verify server has write permissions
-
-## Development
-
-### Making Changes
-
-**Extension:**
-1. Modify source files
-2. Go to `chrome://extensions/`
-3. Click refresh icon on extension
-4. Reload test pages
-
-**Server:**
-1. Modify `mock-server.js`
-2. Restart server: `npm start`
-3. Configuration changes (`.mocks/config.json`) reload automatically
-
-### Adding Features
-
-**Key Files:**
-- `background.js` - Message handling between extension and server
-- `mock-injector.js` - Request interception in page context
-- `popup.js` - UI logic and server communication
-- `mock-server.js` - Server-side rule management and file serving
-
-## Supported File Types
-
-The server automatically detects MIME types:
-- `.json` → `application/json`
-- `.html` → `text/html`
-- `.xml` → `application/xml`
-- `.js` → `application/javascript`
-- `.css` → `text/css`
-- `.csv` → `text/csv`
-- `.txt` → `text/plain`
-- `.svg` → `image/svg+xml`
-- Default → `application/octet-stream`
-
-## License
-
-MIT License - Feel free to modify and use as needed.
-
-## Credits
-
-- Built with Chrome Extensions Manifest V3
-- Uses `declarativeNetRequest` and `fetch` APIs
-- Zero-dependency Node.js server implementation
+A Chrome extension paired with a zero-dependency Node.js server that intercepts HTTP requests and returns mock responses. Built for developers who need fast, file-based request stubbing without any build steps or package managers.
 
 ---
 
-**Version:** 1.0.0
-**Server Port:** 8756 (default)
-**Last Updated:** January 2025
+## How It Works
+
+Mockery uses a hybrid interception architecture to cover every type of browser request:
+
+```
+                         Chrome Extension
+ ┌─────────────────────────────────────────────────────────┐
+ │                                                         │
+ │   MAIN World              ISOLATED World                │
+ │  ┌──────────────┐       ┌────────────────┐             │
+ │  │mock-injector │◄─────►│ content-bridge │             │
+ │  │              │  msg   │                │             │
+ │  │ patches:     │       └───────┬────────┘             │
+ │  │  • fetch()   │               │ chrome.runtime       │
+ │  │  • XHR       │               ▼                      │
+ │  └──────────────┘       ┌────────────────┐             │
+ │                         │  background.js │             │
+ │  declarativeNetRequest  │  service worker│             │
+ │  ┌──────────────┐      └───────┬────────┘             │
+ │  │ intercepts:  │               │                      │
+ │  │  • <img>     │               │ fetch()              │
+ │  │  • <link>    │               ▼                      │
+ │  │  • <script>  ├──────► localhost:8756                │
+ │  └──────────────┘        (Node.js server)              │
+ └─────────────────────────────────────────────────────────┘
+```
+
+**JavaScript requests** (fetch/XHR) are intercepted by patching `window.fetch()` and `XMLHttpRequest` in the page's main world. Matched requests are routed through the extension's background service worker to the local Node server.
+
+**HTML resource requests** (images, stylesheets, scripts, fonts) are intercepted via Chrome's `declarativeNetRequest` API at the network layer and redirected to the same Node server.
+
+---
+
+## Quick Start
+
+```bash
+# Clone the repository
+git clone <repo-url> && cd mockery
+
+# Start the companion server (no install needed)
+node server/index.js
+```
+
+Then load the extension in Chrome:
+
+1. Navigate to `chrome://extensions/`
+2. Enable **Developer mode**
+3. Click **Load unpacked** and select this folder
+4. Toggle the extension on - matched requests will serve your mock files
+
+That's it. No `npm install`, no build step, no configuration ceremony.
+
+---
+
+## Configuration
+
+All mocking rules live in `_mocks/config.js`:
+
+```javascript
+module.exports = [
+  // Static file response
+  {
+    pattern: "https://api.example.com/users",
+    file: "users.json"
+  },
+
+  // Regex pattern matching
+  {
+    pattern: ".*\\.example\\.com.*address-book.*",
+    file: "api/address-book.json",
+    isRegex: true
+  },
+
+  // Dynamic handler (inline)
+  {
+    pattern: "https://api.example.com/time",
+    handler: async (request) => ({
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ time: new Date().toISOString() })
+    })
+  },
+
+  // Imported handler + file combination
+  {
+    pattern: "https://api.example.com/enhanced",
+    file: "users.json",
+    handler: require("./handlers/modify-response.js")
+  }
+];
+```
+
+### Rule Options
+
+| Field       | Type                 | Description                                               |
+|-------------|----------------------|-----------------------------------------------------------|
+| `pattern`   | `string`             | URL to match (exact, substring, or regex)                 |
+| `file`      | `string`             | Path to mock file, relative to `_mocks/`                  |
+| `handler`   | `function \| string` | Dynamic response generator `(request, originalResponse) => response` |
+| `isRegex`   | `boolean`            | Treat `pattern` as a regular expression                   |
+| `method`    | `string`             | HTTP method filter (`GET`, `POST`, etc.) - defaults to `*` |
+| `enabled`   | `boolean`            | Set `false` to skip this rule                             |
+
+---
+
+## Folder Structure
+
+```
+mockery/
+├── manifest.json          # Chrome Extension manifest (MV3)
+├── background.js          # Service worker - routes messages, manages rules
+├── bridge.js              # ISOLATED world - bridges to background
+├── injector.js            # MAIN world - patches fetch() and XHR
+├── popup.html/js/css      # Extension popup UI
+├── package.json           # npm start convenience
+├── server/
+│   └── index.js           # Node.js companion server (zero deps)
+└── _mocks/                # Your mock data
+    ├── config.js          # Rule definitions
+    ├── handlers/          # Dynamic handler functions
+    │   └── utils/
+    │       └── common-responses.js
+    └── (your mock files)
+```
+
+---
+
+## Server
+
+### Commands
+
+```bash
+npm start                                  # Default port 8756
+node server/index.js                       # Same as above
+node server/index.js 9000                  # Custom port
+node server/index.js --config ./custom.js  # Custom config path
+node --watch server/index.js               # Auto-restart on changes (Node 18+)
+```
+
+### Endpoints
+
+| Endpoint                          | Description                                |
+|-----------------------------------|--------------------------------------------|
+| `GET /health`                     | Server status and rule count               |
+| `GET /rules`                      | Current rule list from config              |
+| `GET /resolve?url=<encoded>`      | Resolve and serve a mock for a URL         |
+| `GET /resolve-pattern?pattern=<>` | Serve mock by pattern (declarativeNetRequest) |
+| `GET /events`                     | SSE stream for hot reload                  |
+
+---
+
+## Handler Functions
+
+Handlers receive a request object and an optional original file response, then return a response object:
+
+```javascript
+// _mocks/handlers/example.js
+module.exports = async (request, originalResponse) => {
+  // request: { url, method, headers, body, query, timestamp }
+  // originalResponse: { status, headers, body } (if file is also specified)
+
+  return {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: "Hello from handler" })
+  };
+};
+```
+
+Handlers hot-reload automatically when saved (requires `chokidar` for file watching, otherwise restart the server).
+
+---
+
+## Hot Reload
+
+Mockery supports live reloading without restarting anything:
+
+- **Config changes** (`_mocks/config.js`) - detected via `fs.watch`, broadcast to the extension over SSE
+- **Handler changes** (`_mocks/handlers/**/*.js`) - reloaded on next request (with `chokidar`: instant)
+- **Mock file changes** - served fresh on every request (no caching)
+
+The extension popup also has a **Refresh Rules** button for manual reloads.
+
+---
+
+## Pattern Matching
+
+| Type      | Behavior                                         | Example                        |
+|-----------|--------------------------------------------------|--------------------------------|
+| Exact     | `url === pattern`                                | `https://api.com/users`        |
+| Substring | `url.includes(pattern)`                          | `api/users`                    |
+| Regex     | `new RegExp(pattern).test(url)` (requires `isRegex: true`) | `.*\\.api\\.com/users.*` |
+
+---
+
+## MIME Type Detection
+
+The server auto-detects content types from file extensions, covering:
+
+- **Documents** - JSON, HTML, XML, CSS, JS, CSV, PDF, DOCX, XLSX
+- **Images** - PNG, JPEG, GIF, WebP, SVG, ICO, BMP, TIFF
+- **Media** - MP3, MP4, WAV, AVI
+- **Fonts** - WOFF, WOFF2, TTF, OTF
+- **Archives** - ZIP, TAR, GZIP
+
+Binary files are base64-encoded during transport and reconstructed as proper binary in the browser.
+
+---
+
+## Debugging
+
+| Context         | Where to look                                    | Prefix       |
+|-----------------|--------------------------------------------------|--------------|
+| Page console    | DevTools > Console                               | `[Mockery]`  |
+| Service worker  | `chrome://extensions/` > service worker link     | `[Mockery]`  |
+| Server          | Terminal running the server                       | `[mockery]`     |
+| Extension popup | Activity tab in the popup UI                     | -            |
+
+---
+
+## Why Mockery?
+
+- **Zero dependencies** - runs with Node.js alone, no `node_modules` needed
+- **No build step** - pure JavaScript, ready to run immediately
+- **File-based** - mock data lives in plain files you can version control
+- **Full coverage** - intercepts fetch, XHR, and HTML resource loads
+- **Hot reload** - edit mocks and see changes without restarting
+- **Handler functions** - dynamic responses when static files aren't enough
+- **Binary support** - images, PDFs, fonts all work correctly
+
+---
+
+## License
+
+ISC

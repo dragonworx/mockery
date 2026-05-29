@@ -9,7 +9,7 @@
  *  3. Show toast notifications when a mock is served.
  */
 
-const CHANNEL = '__HTTP_MOCKER__';
+const CHANNEL = '__MOCKERY__';
 
 // ── Push rules into MAIN world ──────────────────────────────────────────────
 
@@ -58,7 +58,7 @@ window.addEventListener('message', (event) => {
 // Re-push when background notifies of config change (SSE hot reload)
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'RULES_CHANGED') {
-    console.log('[HTTP Mocker] Hot reload: rules updated');
+    console.log('[Mockery] Hot reload: rules updated');
     pushRules();
   }
 });
@@ -136,7 +136,7 @@ let toastContainer = null;
 function ensureToastContainer() {
   if (toastContainer) return toastContainer;
   toastContainer = document.createElement('div');
-  toastContainer.id = 'http-mocker-toast-container';
+  toastContainer.id = 'mockery-toast-container';
   toastContainer.style.cssText = `
     position: fixed;
     top: 20px;
@@ -202,4 +202,4 @@ function showToast(url, file, type = 'success', customMessage = null) {
   }, duration);
 }
 
-console.log('[HTTP Mocker] ISOLATED bridge loaded');
+console.log('[Mockery] ISOLATED bridge loaded');

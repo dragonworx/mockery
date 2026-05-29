@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Mock Server — zero-dependency companion for the HTTP Request Mocker extension.
+ * Mock Server — zero-dependency companion for the Mockery Chrome extension.
  *
  * Usage:
  *   cd /path/to/your/project
- *   node /path/to/mock-server.js            # reads .mocks/config.js from cwd
- *   node /path/to/mock-server.js 9000        # custom port
- *   node /path/to/mock-server.js --config ./my-mocks.json   # custom config path
+ *   node server/index.js                    # reads _mocks/config.js from cwd
+ *   node server/index.js 9000               # custom port
+ *   node server/index.js --config ./my-mocks.json   # custom config path
  *
- * Config format (.mocks/config.js):
+ * Config format (_mocks/config.js):
  *   module.exports = [
  *     { pattern: "https://api.example.com/users", file: "users.json" },
  *     { pattern: "https://api.example.com/dynamic", handler: async (req) => ({ status: 200, body: "Hi" }) },
@@ -17,13 +17,13 @@
  *   ];
  *
  * File paths:
- *   - Relative paths without directory separators default to .mocks/ folder
- *   - "users.json" resolves to ".mocks/users.json"
+ *   - Relative paths without directory separators default to _mocks/ folder
+ *   - "users.json" resolves to "_mocks/users.json"
  *   - "data/users.json" stays as "data/users.json" (explicit path)
  *   - Absolute paths are used as-is
  *
  * Handler functions:
- *   - "handler": "handlers/dynamic.js" resolves to ".mocks/handlers/dynamic.js"
+ *   - "handler": "handlers/dynamic.js" resolves to "_mocks/handlers/dynamic.js"
  *   - Handlers receive (request, originalResponse) and return response object
  *   - Hot reloading supported when chokidar is installed (npm install chokidar)
  *   - Can be combined with file to modify existing response
@@ -43,16 +43,16 @@ try {
   chokidarAvailable = true;
 
   // Watch handlers directory for changes
-  const handlersPath = path.join('.mocks', 'handlers');
+  const handlersPath = path.join('_mocks', 'handlers');
   if (fs.existsSync(handlersPath)) {
     chokidar.watch(handlersPath + '/**/*.js').on('change', (filePath) => {
-      console.log(`[mock-server] Handler changed: ${path.relative(process.cwd(), filePath)}`);
+      console.log(`[mockery] Handler changed: ${path.relative(process.cwd(), filePath)}`);
 
       // Clear from cache
       handlerCache.delete(filePath);
       delete require.cache[require.resolve(filePath)];
 
-      console.log('[mock-server] Handler reloaded - next request will use updated version');
+      console.log('[mockery] Handler reloaded - next request will use updated version');
     });
   }
 } catch (err) {
@@ -61,7 +61,7 @@ try {
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 let port = 8756;
-let configPath = path.join(process.cwd(), '.mocks', 'config.js');
+let configPath = path.join(process.cwd(), '_mocks', 'config.js');
 
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
@@ -97,13 +97,13 @@ function loadConfig() {
     }
 
     rules = loadedRules;
-    console.log(`[mock-server] Loaded ${rules.length} rule(s) from ${configPath}`);
+    console.log(`[mockery] Loaded ${rules.length} rule(s) from ${configPath}`);
   } catch (err) {
     if (err.code === 'ENOENT') {
-      console.warn(`[mock-server] Config not found: ${configPath} — starting with 0 rules`);
+      console.warn(`[mockery] Config not found: ${configPath} — starting with 0 rules`);
       rules = [];
     } else {
-      console.error(`[mock-server] Error reading config:`, err.message);
+      console.error(`[mockery] Error reading config:`, err.message);
       rules = [];
     }
   }
@@ -114,7 +114,7 @@ loadConfig();
 try {
   fs.watch(configPath, { persistent: false }, (eventType) => {
     if (eventType === 'change' || eventType === 'rename') {
-      console.log('[mock-server] Config changed, reloading…');
+      console.log('[mockery] Config changed, reloading…');
       loadConfig();
       broadcastConfigChange();
     }
@@ -141,7 +141,7 @@ async function loadHandler(handlerOrPath) {
   }
 
   // Otherwise, treat it as a file path
-  const fullPath = path.resolve('.mocks', handlerOrPath);
+  const fullPath = path.resolve('_mocks', handlerOrPath);
 
   try {
     // Check if handler is cached and file hasn't changed
@@ -173,7 +173,7 @@ async function loadHandler(handlerOrPath) {
 
     return handler;
   } catch (error) {
-    console.error(`[mock-server] Error loading handler ${handlerOrPath}:`, error.message);
+    console.error(`[mockery] Error loading handler ${handlerOrPath}:`, error.message);
     return null;
   }
 }
@@ -204,7 +204,7 @@ async function resolveWithHandler(targetUrl, rule, req, targetMethod) {
           body: content.toString()
         };
       } catch (err) {
-        console.error(`[mock-server] Error reading file ${filePath}:`, err.message);
+        console.error(`[mockery] Error reading file ${filePath}:`, err.message);
         return {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
@@ -228,11 +228,11 @@ async function resolveWithHandler(targetUrl, rule, req, targetMethod) {
         }
 
         const handlerName = typeof rule.handler === 'function' ? 'inline function' : rule.handler;
-        console.log(`[mock-server] ${targetMethod || req.method} ${targetUrl} → ${handlerName} (handler)`);
+        console.log(`[mockery] ${targetMethod || req.method} ${targetUrl} → ${handlerName} (handler)`);
         return result;
       } catch (err) {
         const handlerName = typeof rule.handler === 'function' ? 'inline function' : rule.handler;
-        console.error(`[mock-server] Handler execution error for ${handlerName}:`, err.message);
+        console.error(`[mockery] Handler execution error for ${handlerName}:`, err.message);
         return {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
@@ -257,8 +257,8 @@ function resolveFilePath(file) {
     return file;
   }
 
-  // For relative paths, always try in .mocks/ folder first
-  const mocksRelative = path.join('.mocks', file);
+  // For relative paths, always try in _mocks/ folder first
+  const mocksRelative = path.join('_mocks', file);
   const configDir = path.dirname(path.resolve(configPath));
   const mocksPath = path.join(configDir, mocksRelative);
 
@@ -266,12 +266,12 @@ function resolveFilePath(file) {
     return mocksPath;
   }
 
-  // If not found in .mocks/, try relative to config file directory
+  // If not found in _mocks/, try relative to config file directory
   const configRelative = path.join(configDir, file);
   if (fs.existsSync(configRelative)) {
     return configRelative;
   } else {
-    // Fall back to relative to current working directory in .mocks/
+    // Fall back to relative to current working directory in _mocks/
     return path.resolve(mocksRelative);
   }
 }
@@ -337,6 +337,7 @@ function findMatch(url, method) {
   // First pass: look for exact matches
   for (const rule of rules) {
     try {
+      if (rule.enabled === false) continue;
       if (!methodMatches(rule)) continue;
       if (rule.isRegex) {
         if (new RegExp(rule.pattern).test(url)) {
@@ -355,6 +356,7 @@ function findMatch(url, method) {
   // Second pass: look for substring matches
   for (const rule of rules) {
     try {
+      if (rule.enabled === false) continue;
       if (!methodMatches(rule)) continue;
       if (!rule.isRegex) {
         if (url.includes(rule.pattern)) {
@@ -429,7 +431,7 @@ const server = http.createServer(async (req, res) => {
       }
 
     } catch (error) {
-      console.error(`[mock-server] Request processing error:`, error);
+      console.error(`[mockery] Request processing error:`, error);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Internal server error', detail: error.message }));
     }
@@ -482,7 +484,7 @@ const server = http.createServer(async (req, res) => {
       }
 
     } catch (error) {
-      console.error(`[mock-server] Request processing error:`, error);
+      console.error(`[mockery] Request processing error:`, error);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Internal server error', detail: error.message }));
     }
@@ -522,12 +524,12 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, '127.0.0.1', () => {
-  console.log(`[mock-server] Listening on http://localhost:${port}`);
-  console.log(`[mock-server] Config: ${configPath}`);
-  console.log(`[mock-server] Endpoints:`);
+  console.log(`[mockery] Listening on http://localhost:${port}`);
+  console.log(`[mockery] Config: ${configPath}`);
+  console.log(`[mockery] Endpoints:`);
   console.log(`  GET /resolve?url=<encoded>       — serve a matched mock`);
   console.log(`  GET /resolve-pattern?pattern=<>  — serve mock by pattern (for declarativeNetRequest)`);
-  console.log(`  GET /rules                       — list current rules from .mocks/config.js`);
+  console.log(`  GET /rules                       — list current rules from _mocks/config.js`);
   console.log(`  GET /events                      — SSE stream for hot reload`);
   console.log(`  GET /health                      — server status`);
 });

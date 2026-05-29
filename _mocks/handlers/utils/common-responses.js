@@ -1,5 +1,5 @@
 /**
- * Common response helpers for HTTP Request Mocker handlers
+ * Common response helpers for Mockery handlers
  */
 
 exports.success = (data, headers = {}) => ({

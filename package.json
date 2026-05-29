@@ -1,11 +1,11 @@
 {
-  "name": "http-request-mocker",
+  "name": "mockery",
   "version": "1.0.0",
-  "description": "Chrome extension to intercept HTTP requests and serve stubbed responses",
-  "main": "mock-server.js",
+  "description": "Chrome extension + Node.js server to intercept HTTP requests and serve mock responses",
+  "main": "server/index.js",
   "scripts": {
-    "start": "node mock-server.js",
-    "kill": "pkill -f 'node mock-server.js' || true",
+    "start": "node server/index.js",
+    "kill": "pkill -f 'node.*server/index.js' || true",
     "install-hot-reload": "npm install chokidar --save-optional"
   },
   "keywords": [

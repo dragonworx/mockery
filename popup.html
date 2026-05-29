@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HTTP Request Mocker</title>
+  <title>Mockery</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
     <!-- Header -->
     <div class="header">
-      <h1>HTTP Request Mocker</h1>
+      <h1>Mockery</h1>
       <div class="toggle-container">
         <label class="toggle">
           <input type="checkbox" id="enableToggle">
@@ -27,7 +27,7 @@
         <input type="text" id="serverUrl" placeholder="http://localhost:8765" spellcheck="false">
         <button type="button" id="connectBtn" class="btn btn-small btn-primary">Connect</button>
       </div>
-      <small id="serverHint" class="server-hint">Start server: <code>node mock-server.js</code></small>
+      <small id="serverHint" class="server-hint">Start server: <code>npm start</code></small>
     </div>
 
     <!-- Rules from server -->
@@ -76,12 +76,12 @@
       <details>
         <summary>Setup Guide</summary>
         <ol>
-          <li>Start the server: <code>npm start</code> or <code>node mock-server.js</code></li>
+          <li>Start the server: <code>npm start</code> or <code>node server/index.js</code></li>
           <li>Manage mocks via the file system:
             <ul>
-              <li>Add mock files to the <code>.mocks/</code> folder</li>
+              <li>Add mock files to the <code>_mocks/</code> folder</li>
               <li>Create folders to organize your mocks</li>
-              <li>Edit <code>.mocks/config.js</code> to add URL patterns and file paths</li>
+              <li>Edit <code>_mocks/config.js</code> to add URL patterns and file paths</li>
               <li>Example: <code>{"pattern": "api/users", "file": "users.json"}</code></li>
             </ul>
           </li>
