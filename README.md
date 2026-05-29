@@ -44,7 +44,7 @@ Mockery uses a hybrid interception architecture to cover every type of browser r
 git clone <repo-url> && cd mockery
 
 # Start the companion server (no install needed)
-node server/index.js
+npm start
 ```
 
 Then load the extension in Chrome:
@@ -106,28 +106,6 @@ module.exports = [
 | `isRegex`   | `boolean`            | Treat `pattern` as a regular expression                   |
 | `method`    | `string`             | HTTP method filter (`GET`, `POST`, etc.) - defaults to `*` |
 | `enabled`   | `boolean`            | Set `false` to skip this rule                             |
-
----
-
-## Folder Structure
-
-```
-mockery/
-├── manifest.json          # Chrome Extension manifest (MV3)
-├── background.js          # Service worker - routes messages, manages rules
-├── bridge.js              # ISOLATED world - bridges to background
-├── injector.js            # MAIN world - patches fetch() and XHR
-├── popup.html/js/css      # Extension popup UI
-├── package.json           # npm start convenience
-├── server/
-│   └── index.js           # Node.js companion server (zero deps)
-└── mocks/                # Your mock data
-    ├── config.js          # Rule definitions
-    ├── handlers/          # Dynamic handler functions
-    │   └── utils/
-    │       └── common-responses.js
-    └── (your mock files)
-```
 
 ---
 

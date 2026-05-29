@@ -130,21 +130,63 @@ function renderRules(rules) {
     return;
   }
 
-  rules.forEach((rule) => {
+  rules.forEach((rule, index) => {
     const div = document.createElement('div');
-    div.className = 'rule-item';
+    const enabled = rule.enabled !== false;
+    div.className = `rule-item${enabled ? '' : ' rule-item--disabled'}`;
+    div.dataset.index = index;
 
     const badge = rule.isRegex ? 'regex' : 'exact';
+    const target = rule.file ? escapeHtml(rule.file) : (rule.hasHandler ? 'handler' : '—');
+
     div.innerHTML = `
+      <label class="rule-toggle-wrap">
+        <input type="checkbox" class="rule-toggle-input" ${enabled ? 'checked' : ''}>
+        <span class="rule-toggle-slider"></span>
+      </label>
       <div class="rule-main">
         <span class="rule-pattern">${escapeHtml(rule.pattern)}</span>
-        <div class="rule-file">→ <code>${escapeHtml(rule.file)}</code>
+        <div class="rule-file">→ <code>${target}</code>
           <span class="rule-badge ${badge}">${badge}</span>
         </div>
       </div>
     `;
+
+    const checkbox = div.querySelector('.rule-toggle-input');
+    checkbox.addEventListener('change', () => handleRuleToggle(index, checkbox));
+
     rulesList.appendChild(div);
   });
+}
+
+async function handleRuleToggle(index, checkbox) {
+  const enabled = checkbox.checked;
+  const ruleItem = checkbox.closest('.rule-item');
+
+  // Optimistic UI update
+  ruleItem.classList.toggle('rule-item--disabled', !enabled);
+
+  const base = await serverBase();
+  try {
+    const resp = await fetch(`${base}/rules/${index}/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+
+    if (!resp.ok) throw new Error(`Server responded ${resp.status}`);
+
+    const data = await resp.json();
+    showNotification(`Rule ${enabled ? 'enabled' : 'disabled'}: ${data.pattern}`, 'success');
+
+    // Refresh declarativeNetRequest rules in background
+    chrome.runtime.sendMessage({ type: 'REFRESH_DECLARATIVE_RULES' });
+  } catch (err) {
+    // Revert on failure
+    checkbox.checked = !enabled;
+    ruleItem.classList.toggle('rule-item--disabled', enabled);
+    showNotification('Failed to toggle rule', 'error');
+  }
 }
 
 // ── Activity ─────────────────────────────────────────────────────────────────
