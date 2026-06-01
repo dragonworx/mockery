@@ -151,7 +151,12 @@
             'color:#06b6d4', 'color:inherit',
             'color:#10b981;font-weight:bold'
           );
-          console.log('%crequest  %o', 'color:#64748b;font-weight:bold', { method, url, headers: init?.headers || {}, body: init?.body });
+          const reqBody = init?.body;
+          let parsedReqBody = reqBody;
+          if (typeof reqBody === 'string' && reqBody.startsWith('{') && reqBody.endsWith('}')) {
+            try { parsedReqBody = JSON.parse(reqBody); } catch { /* keep as string */ }
+          }
+          console.log('%crequest  %o', 'color:#64748b;font-weight:bold', { method, url, headers: init?.headers || {}, body: parsedReqBody });
           console.log('%coriginal %o', 'color:#f59e0b;font-weight:bold', originalRes ? { status: originalRes.status, body: parsedOriginal } : '(failed or unavailable)');
           console.log('%cmocked   %o', 'color:#10b981;font-weight:bold', { status: 200, mime: mock.mime, body: parsedMock });
           console.groupEnd();
@@ -238,7 +243,11 @@
           'color:#06b6d4', 'color:inherit',
           'color:#10b981;font-weight:bold'
         );
-        console.log('%crequest  %o', 'color:#64748b;font-weight:bold', { method: xhrMethod, url, body });
+        let parsedReqBody = body;
+        if (typeof body === 'string' && body.startsWith('{') && body.endsWith('}')) {
+          try { parsedReqBody = JSON.parse(body); } catch { /* keep as string */ }
+        }
+        console.log('%crequest  %o', 'color:#64748b;font-weight:bold', { method: xhrMethod, url, body: parsedReqBody });
         console.log('%coriginal %o', 'color:#f59e0b;font-weight:bold', originalRes ? { status: originalRes.status, body: parsedOriginal } : '(failed or unavailable)');
         console.log('%cmocked   %o', 'color:#10b981;font-weight:bold', { status: 200, mime: mock.mime, body: parsedMock });
         console.groupEnd();
