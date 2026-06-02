@@ -141,6 +141,8 @@ chrome.storage.local.onChanged.addListener((changes) => {
  * and notifies all tabs to re-fetch rules.
  */
 let sseRetryTimeout = null;
+let sseRetryDelay = 1000;
+const SSE_MAX_RETRY_DELAY = 30000;
 
 function connectSSE() {
   chrome.storage.local.get(['serverUrl', 'enabled'], ({ serverUrl, enabled }) => {
@@ -151,6 +153,9 @@ function connectSSE() {
 
     fetch(`${base}/events`, { signal: controller.signal })
       .then(response => {
+        // Connected successfully — reset backoff
+        sseRetryDelay = 1000;
+
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
 
@@ -191,7 +196,8 @@ function connectSSE() {
 
 function scheduleSSEReconnect() {
   if (sseRetryTimeout) clearTimeout(sseRetryTimeout);
-  sseRetryTimeout = setTimeout(connectSSE, 3000);
+  sseRetryTimeout = setTimeout(connectSSE, sseRetryDelay);
+  sseRetryDelay = Math.min(sseRetryDelay * 2, SSE_MAX_RETRY_DELAY);
 }
 
 function notifyAllTabs() {

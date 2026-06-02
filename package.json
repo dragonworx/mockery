@@ -1,6 +1,6 @@
 {
   "name": "mockery",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Chrome extension + Node.js server to intercept HTTP requests and serve mock responses",
   "main": "server/index.js",
   "scripts": {
@@ -18,6 +18,6 @@
   "author": "",
   "license": "ISC",
   "engines": {
-    "node": ">=12.0.0"
+    "node": ">=18.0.0"
   }
 }

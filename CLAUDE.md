@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HTTP Request Mocker is a Chrome extension with a companion Node.js server that intercepts HTTP requests and returns mock responses. The extension uses Manifest V3 and injects code into the page's main world to patch `fetch()` and `XMLHttpRequest`.
+Mockery is a Chrome extension with a companion Node.js server that intercepts HTTP requests and returns mock responses. The extension uses Manifest V3 and injects code into the page's main world to patch `fetch()` and `XMLHttpRequest`.
 
-**Zero Dependencies** - This project runs with just Node.js (18+) and has no external dependencies. No package.json, no node_modules, no build steps!
+**Zero Dependencies** - This project runs with just Node.js (18+) and has no external dependencies. No node_modules, no build steps!
 
 ## Quick Start
 
@@ -15,10 +15,10 @@ For developers who just downloaded this repository:
 ```bash
 # 1. Clone the repository
 git clone <repo-url>
-cd http-request-mocker
+cd mockery
 
 # 2. Start the server (no installation needed!)
-node mock-server.js
+node server/index.js
 
 # 3. Load the Chrome extension
 # - Go to chrome://extensions/
@@ -32,19 +32,19 @@ node mock-server.js
 ### Server Operations
 ```bash
 # Start the mock server (default port 8756)
-node mock-server.js
+node server/index.js
 
 # Start with custom port
-node mock-server.js 9000
+node server/index.js 9000
 
 # Start with custom config file
-node mock-server.js --config ./my-mocks.js
+node server/index.js --config ./my-mocks.js
 
 # Auto-restart server on changes (Node.js 18+)
-node --watch mock-server.js
+node --watch server/index.js
 
 # Stop the server (if needed)
-pkill -f 'node.*mock-server.js'
+pkill -f 'node.*server/index.js'
 ```
 
 ### Extension Development
@@ -69,8 +69,8 @@ pkill -f 'node.*mock-server.js'
 The extension uses a **hybrid architecture** that intercepts different types of requests through different mechanisms:
 
 1. **JavaScript Requests** (fetch/XMLHttpRequest)
-   - **MAIN-world Script** (`mock-injector.js`) - patches `window.fetch()` and `XMLHttpRequest.prototype`
-   - **ISOLATED-world Bridge** (`content-bridge.js`) - bridges to background service worker
+   - **MAIN-world Script** (`injector.js`) - patches `window.fetch()` and `XMLHttpRequest.prototype`
+   - **ISOLATED-world Bridge** (`bridge.js`) - bridges to background service worker
    - **Background Service Worker** (`background.js`) - fetches from Node server
 
 2. **HTML Resource Requests** (img tags, CSS, script tags)
@@ -83,8 +83,8 @@ The extension uses a **hybrid architecture** that intercepts different types of 
 **JavaScript Request:**
 ```
 fetch("https://api.example.com/users")
-  → mock-injector.js (MAIN world) checks rules
-  → postMessage to content-bridge.js (ISOLATED world)
+  → injector.js (MAIN world) checks rules
+  → postMessage to bridge.js (ISOLATED world)
   → chrome.runtime.sendMessage to background.js
   → fetch from Node server (localhost:8756)
   → response back through chain
@@ -297,7 +297,10 @@ The extension properly handles binary files (images, PDFs, fonts, archives) by:
 
 - `GET /health` — Server status and rule count
 - `GET /rules` — List all rules from mocks/config.js
-- `GET /resolve?url=<encoded>` — Resolve mock for URL (used by extension)
+- `GET /resolve?url=<encoded>&method=<method>` — Resolve mock for URL (used by extension)
+- `GET /resolve-pattern?pattern=<encoded>` — Resolve mock by pattern (used by declarativeNetRequest)
+- `GET /events` — SSE stream for hot reload notifications
+- `POST /rules/:index/toggle` — Enable/disable a specific rule
 
 ## Testing Handler Functions
 
@@ -307,7 +310,7 @@ The handler functionality can be tested directly through the mock server endpoin
 
 ```bash
 # Start the server
-node mock-server.js
+node server/index.js
 
 # Test static file response
 curl "http://localhost:8756/resolve?url=https://api.example.com/users"
@@ -353,10 +356,10 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 - HTML escaping in popup UI to prevent XSS
 
 ### Debugging
-- MAIN world logs: Open page console, look for `[HTTP Mocker]`
-- ISOLATED world logs: Open page console, look for `[HTTP Mocker] ISOLATED bridge loaded`
+- MAIN world logs: Open page console, look for `[Mockery]`
+- ISOLATED world logs: Open page console, look for `[Mockery] ISOLATED bridge loaded`
 - Background logs: Go to `chrome://extensions/` → "service worker" link
-- Server logs: Watch terminal where `node mock-server.js` is running
+- Server logs: Watch terminal where `node server/index.js` is running
 - Activity tracking: Check "Activity" tab in extension popup
 
 ## File Structure
@@ -365,13 +368,14 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 .
 ├── manifest.json           # Extension configuration (Manifest V3)
 ├── background.js          # Background service worker
-├── content-bridge.js      # ISOLATED-world bridge script
-├── mock-injector.js       # MAIN-world request interceptor
+├── bridge.js              # ISOLATED-world bridge script
+├── injector.js            # MAIN-world request interceptor
 ├── popup.html/js/css      # Extension popup UI
-├── mock-server.js         # Node.js companion server (zero dependencies!)
-└── mocks/               # Mock response files (organize as needed)
-    ├── config.js         # Server configuration (JavaScript module)
-    └── handlers/         # JavaScript handler functions
+├── server/
+│   └── index.js           # Node.js companion server (zero dependencies!)
+└── mocks/                 # Mock response files (organize as needed)
+    ├── config.js          # Server configuration (JavaScript module)
+    └── handlers/          # JavaScript handler functions
 ```
 
 ## Distribution Benefits

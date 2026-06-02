@@ -604,3 +604,14 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`  GET /events                      — SSE stream for hot reload`);
   console.log(`  GET /health                      — server status`);
 });
+
+// Graceful shutdown
+function shutdown(signal) {
+  console.log(`\n[mockery] ${signal} received, shutting down…`);
+  server.close(() => process.exit(0));
+  // Force exit if connections don't close within 3s
+  setTimeout(() => process.exit(1), 3000);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

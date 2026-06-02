@@ -112,13 +112,6 @@
     // Wait for rules to be loaded before deciding
     await rulesLoaded;
 
-    // Diagnostic log for address-book URLs
-    if (url.includes('address-book')) {
-      console.log(`%c[Mockery]%c fetch intercepted: ${method} %c${url}`, 'color:#8b5cf6;font-weight:bold', 'color:inherit;font-weight:bold', 'color:#06b6d4');
-      console.log(`%c[Mockery]%c enabled=%c${enabled}%c, rules.length=%c${rules.length}`, 'color:#8b5cf6;font-weight:bold', 'color:inherit', 'color:#f59e0b;font-weight:bold', 'color:inherit', 'color:#f59e0b;font-weight:bold');
-      rules.forEach((r, i) => console.log(`%c[Mockery]%c rule[${i}]: method=%c${r.method}%c, pattern=%c${r.pattern.substring(0, 60)}…`, 'color:#8b5cf6;font-weight:bold', 'color:inherit', 'color:#10b981', 'color:inherit', 'color:#06b6d4'));
-    }
-
     const rule = findMatch(url, method);
 
     if (rule) {
