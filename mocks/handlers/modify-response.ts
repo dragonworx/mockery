@@ -3,7 +3,9 @@
  * Takes a base JSON file and adds dynamic fields to it
  */
 
-module.exports = async (request, originalResponse) => {
+import type { HandlerFunction } from '../../server/index.ts';
+
+const handler: HandlerFunction = async (request, originalResponse) => {
   // If we don't have an original response, return an error
   if (!originalResponse) {
     return {
@@ -15,7 +17,7 @@ module.exports = async (request, originalResponse) => {
 
   try {
     // Parse the original JSON response
-    const data = JSON.parse(originalResponse.body);
+    const data = JSON.parse(originalResponse.body as string);
 
     // Add dynamic fields based on request
     const url = new URL(request.url);
@@ -27,12 +29,12 @@ module.exports = async (request, originalResponse) => {
 
     // If it's an array, add fields to each item
     if (Array.isArray(data)) {
-      modifiedData = data.map((item, index) => ({
+      modifiedData = data.map((item: any, index: number) => ({
         ...item,
         ...(addTimestamps && { lastModified: new Date().toISOString() }),
         ...(addMetadata && {
           requestIndex: index,
-          processedBy: 'modify-response.js',
+          processedBy: 'modify-response.ts',
           userAgent: request.headers['user-agent']?.substr(0, 50)
         })
       }));
@@ -43,7 +45,7 @@ module.exports = async (request, originalResponse) => {
         ...data,
         ...(addTimestamps && { lastModified: new Date().toISOString() }),
         ...(addMetadata && {
-          processedBy: 'modify-response.js',
+          processedBy: 'modify-response.ts',
           requestMethod: request.method,
           userAgent: request.headers['user-agent']?.substr(0, 50)
         })
@@ -54,13 +56,13 @@ module.exports = async (request, originalResponse) => {
       ...originalResponse,
       headers: {
         ...originalResponse.headers,
-        'X-Modified-By': 'modify-response.js',
+        'X-Modified-By': 'modify-response.ts',
         'X-Modified-At': new Date().toISOString()
       },
       body: JSON.stringify(modifiedData, null, 2)
     };
 
-  } catch (error) {
+  } catch (error: any) {
     return {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -72,3 +74,5 @@ module.exports = async (request, originalResponse) => {
     };
   }
 };
+
+export default handler;

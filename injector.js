@@ -118,25 +118,12 @@
       if (enableLogging) {
         console.log(`%c[Mockery]%c ${method} %c${url}%c — %crule matched%c, requesting mock…`, 'color:#8b5cf6;font-weight:bold', 'color:inherit;font-weight:bold', 'color:#06b6d4', 'color:inherit', 'color:#10b981;font-weight:bold', 'color:inherit');
       }
-      // Fetch mock and original response in parallel
-      const [mock, originalRes] = await Promise.all([
-        requestMock(url, method),
-        originalFetch.apply(this, arguments).catch(() => null),
-      ]);
+      const mock = await requestMock(url, method);
 
       if (mock) {
         if (enableLogging) {
           let parsedMock;
           try { parsedMock = JSON.parse(mock.body); } catch { parsedMock = mock.body; }
-
-          let parsedOriginal = null;
-          if (originalRes) {
-            try {
-              const cloned = originalRes.clone();
-              const text = await cloned.text();
-              try { parsedOriginal = JSON.parse(text); } catch { parsedOriginal = text; }
-            } catch { /* ignore */ }
-          }
 
           console.groupCollapsed(
             `%c[Mockery]%c ${method} %c${url}%c → %c${rule.file || 'handler'}`,
@@ -150,7 +137,6 @@
             try { parsedReqBody = JSON.parse(reqBody); } catch { /* keep as string */ }
           }
           console.log('%crequest  %o', 'color:#64748b;font-weight:bold', { method, url, headers: init?.headers || {}, body: parsedReqBody });
-          console.log('%coriginal %o', 'color:#f59e0b;font-weight:bold', originalRes ? { status: originalRes.status, body: parsedOriginal } : '(failed or unavailable)');
           console.log('%cmocked   %o', 'color:#10b981;font-weight:bold', { status: 200, mime: mock.mime, body: parsedMock });
           console.groupEnd();
         }
@@ -209,13 +195,7 @@
       }
 
       const xhrMethod = xhr.__mockMethod || 'GET';
-      Promise.all([
-        requestMock(url, xhrMethod),
-        // Fire the original request in parallel to capture the original response for logging
-        enableLogging
-          ? originalFetch(url, { method: xhrMethod, body: body, headers: {} }).then(r => r.text().then(t => ({ status: r.status, body: t }))).catch(() => null)
-          : Promise.resolve(null),
-      ]).then(([mock, originalRes]) => {
+      requestMock(url, xhrMethod).then((mock) => {
       if (!mock) {
         // Fallback to real network
         origSend.call(xhr, body);
@@ -225,11 +205,6 @@
       let parsedMock;
       try { parsedMock = JSON.parse(mock.body); } catch { parsedMock = mock.body; }
       if (enableLogging) {
-        let parsedOriginal = null;
-        if (originalRes) {
-          try { parsedOriginal = JSON.parse(originalRes.body); } catch { parsedOriginal = originalRes.body; }
-        }
-
         console.groupCollapsed(
           `%c[Mockery]%c ${xhrMethod} %c${url}%c → %c${rule.file || 'handler'}`,
           'color:#8b5cf6;font-weight:bold', 'color:inherit;font-weight:bold',
@@ -241,7 +216,6 @@
           try { parsedReqBody = JSON.parse(body); } catch { /* keep as string */ }
         }
         console.log('%crequest  %o', 'color:#64748b;font-weight:bold', { method: xhrMethod, url, body: parsedReqBody });
-        console.log('%coriginal %o', 'color:#f59e0b;font-weight:bold', originalRes ? { status: originalRes.status, body: parsedOriginal } : '(failed or unavailable)');
         console.log('%cmocked   %o', 'color:#10b981;font-weight:bold', { status: 200, mime: mock.mime, body: parsedMock });
         console.groupEnd();
       }

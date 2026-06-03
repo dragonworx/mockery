@@ -3,12 +3,13 @@
  * Generates completely dynamic responses based on request parameters
  */
 
-const { success, error } = require('./utils/common-responses');
+import { success } from './utils/common-responses.ts';
+import type { HandlerFunction } from '../../server/index.ts';
 
-module.exports = async (request, originalResponse) => {
+const handler: HandlerFunction = async (request, _originalResponse) => {
   const url = new URL(request.url);
   const name = url.searchParams.get('name') || 'Anonymous';
-  const count = parseInt(url.searchParams.get('count')) || 1;
+  const count = parseInt(url.searchParams.get('count') || '1') || 1;
 
   // Example: different behavior based on request method
   if (request.method === 'POST') {
@@ -37,3 +38,5 @@ module.exports = async (request, originalResponse) => {
     }
   });
 };
+
+export default handler;

@@ -16,13 +16,15 @@ const activityList = document.getElementById('activityList');
 const clearActivityBtn = document.getElementById('clearActivityBtn');
 const notifyToggle = document.getElementById('notifyToggle');
 const logToggle = document.getElementById('logToggle');
+const toastDurationInput = document.getElementById('toastDuration');
 
 const DEFAULT_SERVER = 'http://localhost:8756';
+const DEFAULT_TOAST_DURATION = 10;
 
 // ── Init ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  const { enabled, serverUrl, showNotifications, enableLogging } = await chrome.storage.local.get([
-    'enabled', 'serverUrl', 'showNotifications', 'enableLogging'
+  const { enabled, serverUrl, showNotifications, enableLogging, toastDuration } = await chrome.storage.local.get([
+    'enabled', 'serverUrl', 'showNotifications', 'enableLogging', 'toastDuration'
   ]);
 
   enableToggle.checked = enabled !== false;
@@ -32,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load settings with defaults
   notifyToggle.checked = showNotifications !== false; // Default to true
   logToggle.checked = enableLogging !== false;       // Default to true
+  toastDurationInput.value = clampDuration(toastDuration);
 
   enableToggle.addEventListener('change', handleToggle);
   connectBtn.addEventListener('click', handleConnect);
@@ -39,6 +42,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   clearActivityBtn.addEventListener('click', handleClearActivity);
   notifyToggle.addEventListener('change', handleNotifyToggle);
   logToggle.addEventListener('change', handleLogToggle);
+  toastDurationInput.addEventListener('change', handleToastDurationChange);
+  toastDurationInput.addEventListener('blur', handleToastDurationChange);
 
   await checkServer();
   await loadActivity();
@@ -66,6 +71,18 @@ async function handleNotifyToggle() {
 async function handleLogToggle() {
   const enableLogging = logToggle.checked;
   await chrome.storage.local.set({ enableLogging });
+}
+
+function clampDuration(value) {
+  const n = Number.parseInt(value, 10);
+  if (!Number.isFinite(n)) return DEFAULT_TOAST_DURATION;
+  return Math.min(60, Math.max(1, n));
+}
+
+async function handleToastDurationChange() {
+  const toastDuration = clampDuration(toastDurationInput.value);
+  toastDurationInput.value = toastDuration;
+  await chrome.storage.local.set({ toastDuration });
 }
 
 // ── Server connection ────────────────────────────────────────────────────────

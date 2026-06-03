@@ -1,23 +1,25 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
-const fs = require('fs');
-const path = require('path');
+import { readFileSync, writeFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const TEST_FILE = path.join(__dirname, '..', 'mocks', 'aem', 'test.json');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const TEST_FILE = join(__dirname, '..', 'mocks', 'aem', 'test.json');
 
 function loadData() {
-  return JSON.parse(fs.readFileSync(TEST_FILE, 'utf8'));
+  return JSON.parse(readFileSync(TEST_FILE, 'utf8'));
 }
 
-function saveData(data) {
-  fs.writeFileSync(TEST_FILE, JSON.stringify(data, null, 2) + '\n');
+function saveData(data: any) {
+  writeFileSync(TEST_FILE, JSON.stringify(data, null, 2) + '\n');
 }
 
-function getControls(data) {
+function getControls(data: any) {
   return data.tracking.controlTracking.controls;
 }
 
-function buildControl(controlId, trigger) {
+function buildControl(controlId: string, trigger: string) {
   return {
     controlId,
     trigger,
@@ -69,7 +71,7 @@ function buildControl(controlId, trigger) {
           subSubSubsection: ""
         },
         personalisation: {},
-        product: { featureId: "", productId: [] },
+        product: { featureId: "", productId: [] as string[] },
         tools: {},
         trackingDetails: {
           ECID: "{SC_ecid}",
@@ -98,7 +100,7 @@ function buildControl(controlId, trigger) {
   };
 }
 
-function listControls(controls) {
+function listControls(controls: any[]) {
   if (controls.length === 0) {
     console.log('No controls found.');
     return;
@@ -112,8 +114,8 @@ function listControls(controls) {
   console.log(`\n  Total: ${controls.length} control(s)\n`);
 }
 
-function parseArgs(argv) {
-  const args = { action: null, id: null, event: null };
+function parseArgs(argv: string[]) {
+  const args: { action: string | null; id: string | null; event: string | null } = { action: null, id: null, event: null };
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
       case '-a': args.action = 'add'; args.id = argv[++i]; break;
@@ -128,9 +130,9 @@ function parseArgs(argv) {
 function usage() {
   console.log(`
 Usage:
-  ./scripts/aem.js -a <controlId> -e <eventType>   Add a control
-  ./scripts/aem.js -d <controlId>                  Delete a control by ID
-  ./scripts/aem.js -l                              List all controls
+  bun scripts/aem.ts -a <controlId> -e <eventType>   Add a control
+  bun scripts/aem.ts -d <controlId>                  Delete a control by ID
+  bun scripts/aem.ts -l                              List all controls
 `);
 }
 
@@ -156,7 +158,7 @@ switch (args.action) {
       usage();
       process.exit(1);
     }
-    if (controls.find(c => c.controlId === args.id)) {
+    if (controls.find((c: any) => c.controlId === args.id)) {
       console.error(`Error: Control "${args.id}" already exists.`);
       process.exit(1);
     }
@@ -171,7 +173,7 @@ switch (args.action) {
       usage();
       process.exit(1);
     }
-    const idx = controls.findIndex(c => c.controlId === args.id);
+    const idx = controls.findIndex((c: any) => c.controlId === args.id);
     if (idx === -1) {
       console.error(`Error: Control "${args.id}" not found.`);
       process.exit(1);

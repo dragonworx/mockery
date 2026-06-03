@@ -3,21 +3,22 @@
  * Demonstrates filtering responses based on query parameters
  */
 
-const { json, error } = require('./utils/common-responses');
+import { json, error } from './utils/common-responses.ts';
+import type { HandlerFunction } from '../../server/index.ts';
 
-module.exports = async (request, originalResponse) => {
+const handler: HandlerFunction = async (request, originalResponse) => {
   const url = new URL(request.url);
   const searchTerm = url.searchParams.get('q');
-  const limit = parseInt(url.searchParams.get('limit')) || 10;
+  const limit = parseInt(url.searchParams.get('limit') || '10') || 10;
   const sortBy = url.searchParams.get('sort') || 'name';
   const order = url.searchParams.get('order') === 'desc' ? -1 : 1;
 
   // If we have an original response, filter and sort it
   if (originalResponse) {
     try {
-      const data = JSON.parse(originalResponse.body);
+      const data = JSON.parse(originalResponse.body as string);
 
-      let results = Array.isArray(data) ? data : [data];
+      let results: any[] = Array.isArray(data) ? data : [data];
 
       // Apply search filter if provided
       if (searchTerm) {
@@ -28,7 +29,7 @@ module.exports = async (request, originalResponse) => {
       }
 
       // Apply sorting if the sort field exists
-      if (sortBy && results.length > 0 && results[0].hasOwnProperty(sortBy)) {
+      if (sortBy && results.length > 0 && Object.hasOwn(results[0], sortBy)) {
         results.sort((a, b) => {
           const aVal = a[sortBy];
           const bVal = b[sortBy];
@@ -55,7 +56,7 @@ module.exports = async (request, originalResponse) => {
         processedAt: new Date().toISOString()
       });
 
-    } catch (err) {
+    } catch (err: any) {
       return error('Failed to process original response: ' + err.message, 500);
     }
   }
@@ -69,7 +70,7 @@ module.exports = async (request, originalResponse) => {
     { id: 5, name: 'Eggplant', category: 'Vegetable', price: 1.80 }
   ];
 
-  let results = sampleData;
+  let results = sampleData as any[];
 
   // Apply search filter
   if (searchTerm) {
@@ -80,7 +81,7 @@ module.exports = async (request, originalResponse) => {
   }
 
   // Apply sorting
-  if (sortBy && results.length > 0 && results[0].hasOwnProperty(sortBy)) {
+  if (sortBy && results.length > 0 && Object.hasOwn(results[0], sortBy)) {
     results.sort((a, b) => {
       const aVal = a[sortBy];
       const bVal = b[sortBy];
@@ -108,3 +109,5 @@ module.exports = async (request, originalResponse) => {
     processedAt: new Date().toISOString()
   });
 };
+
+export default handler;

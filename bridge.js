@@ -10,6 +10,19 @@
  */
 
 const CHANNEL = '__MOCKERY__';
+const DEFAULT_TOAST_DURATION_MS = 10000;
+let toastDurationMs = DEFAULT_TOAST_DURATION_MS;
+
+function applyToastDuration(value) {
+  const n = Number.parseInt(value, 10);
+  if (Number.isFinite(n) && n >= 1 && n <= 60) {
+    toastDurationMs = n * 1000;
+  } else {
+    toastDurationMs = DEFAULT_TOAST_DURATION_MS;
+  }
+}
+
+chrome.storage.local.get('toastDuration').then(({ toastDuration }) => applyToastDuration(toastDuration));
 
 // ── Push rules into MAIN world ──────────────────────────────────────────────
 
@@ -44,6 +57,9 @@ pushRules();
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && (changes.enabled || changes.serverUrl || changes.showNotifications || changes.enableLogging)) {
     pushRules();
+  }
+  if (area === 'local' && changes.toastDuration) {
+    applyToastDuration(changes.toastDuration.newValue);
   }
 });
 
@@ -132,9 +148,34 @@ function parseErrorDetail(detail) {
 }
 
 let toastContainer = null;
+let toastList = null;
+let dismissAllBtn = null;
+
+function dismissToast(toast) {
+  if (!toast || toast.__dismissed) return;
+  toast.__dismissed = true;
+  if (toast.__timer) clearTimeout(toast.__timer);
+  toast.style.opacity = '0';
+  toast.style.transform = 'translateX(100%)';
+  setTimeout(() => {
+    toast.remove();
+    updateDismissAllVisibility();
+  }, 300);
+}
+
+function dismissAllToasts() {
+  if (!toastList) return;
+  for (const t of Array.from(toastList.children)) dismissToast(t);
+}
+
+function updateDismissAllVisibility() {
+  if (!dismissAllBtn || !toastList) return;
+  const active = Array.from(toastList.children).filter(t => !t.__dismissed).length;
+  dismissAllBtn.style.display = active > 1 ? 'inline-flex' : 'none';
+}
 
 function ensureToastContainer() {
-  if (toastContainer) return toastContainer;
+  if (toastContainer) return toastList;
   toastContainer = document.createElement('div');
   toastContainer.id = 'mockery-toast-container';
   toastContainer.style.cssText = `
@@ -144,62 +185,140 @@ function ensureToastContainer() {
     z-index: 10000;
     pointer-events: none;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
   `;
+
+  dismissAllBtn = document.createElement('button');
+  dismissAllBtn.type = 'button';
+  dismissAllBtn.textContent = 'Dismiss all';
+  dismissAllBtn.style.cssText = `
+    display: none;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: #fff;
+    background: rgba(30, 30, 30, 0.85);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    cursor: pointer;
+    pointer-events: auto;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+  dismissAllBtn.addEventListener('click', dismissAllToasts);
+  toastContainer.appendChild(dismissAllBtn);
+
+  toastList = document.createElement('div');
+  toastList.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    pointer-events: none;
+  `;
+  toastContainer.appendChild(toastList);
+
   document.body.appendChild(toastContainer);
-  return toastContainer;
+  return toastList;
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function splitUrl(url) {
+  try {
+    const u = new URL(url);
+    return {
+      origin: u.origin,
+      path: u.pathname + u.search + u.hash,
+    };
+  } catch {
+    return { origin: '', path: url };
+  }
 }
 
 function showToast(url, file, type = 'success', customMessage = null) {
-  const container = ensureToastContainer();
-  let displayUrl = url;
-  try {
-    const u = new URL(url);
-    displayUrl = u.hostname + u.pathname;
-    if (displayUrl.length > 50) displayUrl = displayUrl.substring(0, 47) + '…';
-  } catch {}
-
+  const list = ensureToastContainer();
   const isError = type === 'error';
   const toast = document.createElement('div');
 
   // Different styles for success vs error
   const backgroundColor = isError ? '#f8d7da' : '#d4edda';
-  const textColor = isError ? '#721c24' : '#155724';
-  const borderColor = isError ? '#f5c6cb' : '#c3e6cb';
+  const textColor      = isError ? '#721c24' : '#155724';
+  const borderColor    = isError ? '#f5c6cb' : '#c3e6cb';
+  const accentColor    = isError ? '#a71d2a' : '#0b5d2a';
+  const mutedColor     = isError ? '#9c4951' : '#4a7a59';
+  const label          = isError ? 'MOCK ERROR' : 'MOCKED';
+  const icon           = isError ? '❌' : '🔄';
 
   toast.style.cssText = `
+    position: relative;
     background: ${backgroundColor}; color: ${textColor};
     border: 1px solid ${borderColor};
-    padding: 12px 16px; border-radius: 6px;
+    border-left: 4px solid ${accentColor};
+    padding: 10px 14px; border-radius: 6px;
     margin-bottom: 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    font-size: 14px; font-weight: 500;
-    max-width: 380px; word-wrap: break-word;
+    font-size: 13px; line-height: 1.4;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: min(720px, calc(100vw - 40px));
+    width: max-content;
     pointer-events: auto;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
     opacity: 0; transform: translateX(100%);
     transition: all 0.3s ease-out;
   `;
 
-  // Different messages for success vs error
+  const { origin, path } = splitUrl(url);
+
   if (isError) {
-    toast.textContent = `❌ Mock Error: ${displayUrl} - ${customMessage}`;
+    toast.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <span style="font-size:14px;">${icon}</span>
+        <span style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:${accentColor};">${label}</span>
+        <span style="font-size:12px;color:${mutedColor};">${escapeHtml(customMessage || '')}</span>
+      </div>
+      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;">
+        <span style="color:${mutedColor};">${escapeHtml(origin)}</span><span style="font-weight:600;color:${textColor};">${escapeHtml(path)}</span>
+      </div>
+    `;
   } else {
-    toast.textContent = `🔄 Mock: ${displayUrl} → ${file || 'stub'}`;
+    toast.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <span style="font-size:14px;">${icon}</span>
+        <span style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:${accentColor};">${label}</span>
+        <span style="font-size:12px;color:${mutedColor};">→ ${escapeHtml(file || 'stub')}</span>
+      </div>
+      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;">
+        <span style="color:${mutedColor};">${escapeHtml(origin)}</span><span style="font-weight:600;color:${textColor};">${escapeHtml(path)}</span>
+      </div>
+    `;
   }
 
-  container.appendChild(toast);
+  toast.title = 'Click to dismiss';
+  toast.addEventListener('click', () => dismissToast(toast));
+
+  list.appendChild(toast);
+  updateDismissAllVisibility();
 
   requestAnimationFrame(() => {
     toast.style.opacity = '1';
     toast.style.transform = 'translateX(0)';
   });
 
-  // Error toasts stay longer (6s vs 4s)
-  const duration = isError ? 6000 : 4000;
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateX(100%)';
-    setTimeout(() => toast.remove(), 300);
-  }, duration);
+  toast.__timer = setTimeout(() => dismissToast(toast), toastDurationMs);
 }
 
 console.log('[Mockery] ISOLATED bridge loaded');

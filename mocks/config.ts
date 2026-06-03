@@ -1,7 +1,9 @@
 // Mockery Configuration
 // This file defines URL patterns and their corresponding mock responses
 
-module.exports = [
+import type { MockRule } from '../server/index.ts';
+
+export default [
   {
     pattern: "^https://edge\\.adobedc\\.net/ee/aus3/v1/interact",
     method: "POST",
@@ -64,4 +66,4 @@ module.exports = [
     isRegex: false,
     enabled: false,
   }
-];
+] satisfies MockRule[];

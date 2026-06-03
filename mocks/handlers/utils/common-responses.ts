@@ -2,7 +2,9 @@
  * Common response helpers for Mockery handlers
  */
 
-exports.success = (data, headers = {}) => ({
+import type { HandlerResponse } from '../../../server/index.ts';
+
+export const success = (data: unknown, headers: Record<string, string> = {}): HandlerResponse => ({
   status: 200,
   headers: {
     'Content-Type': 'application/json',
@@ -11,7 +13,7 @@ exports.success = (data, headers = {}) => ({
   body: JSON.stringify({ success: true, data })
 });
 
-exports.error = (message, status = 400, headers = {}) => ({
+export const error = (message: string, status = 400, headers: Record<string, string> = {}): HandlerResponse => ({
   status,
   headers: {
     'Content-Type': 'application/json',
@@ -20,7 +22,7 @@ exports.error = (message, status = 400, headers = {}) => ({
   body: JSON.stringify({ success: false, error: message })
 });
 
-exports.json = (data, status = 200, headers = {}) => ({
+export const json = (data: unknown, status = 200, headers: Record<string, string> = {}): HandlerResponse => ({
   status,
   headers: {
     'Content-Type': 'application/json',
@@ -29,7 +31,7 @@ exports.json = (data, status = 200, headers = {}) => ({
   body: JSON.stringify(data)
 });
 
-exports.text = (content, status = 200, headers = {}) => ({
+export const text = (content: string, status = 200, headers: Record<string, string> = {}): HandlerResponse => ({
   status,
   headers: {
     'Content-Type': 'text/plain',
@@ -38,7 +40,7 @@ exports.text = (content, status = 200, headers = {}) => ({
   body: String(content)
 });
 
-exports.html = (content, status = 200, headers = {}) => ({
+export const html = (content: string, status = 200, headers: Record<string, string> = {}): HandlerResponse => ({
   status,
   headers: {
     'Content-Type': 'text/html',

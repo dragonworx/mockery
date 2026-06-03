@@ -4,23 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Mockery is a Chrome extension with a companion Node.js server that intercepts HTTP requests and returns mock responses. The extension uses Manifest V3 and injects code into the page's main world to patch `fetch()` and `XMLHttpRequest`.
+Mockery is a Chrome extension with a companion Bun server that intercepts HTTP requests and returns mock responses. The extension uses Manifest V3 and injects code into the page's main world to patch `fetch()` and `XMLHttpRequest`.
 
-**Zero Dependencies** - This project runs with just Node.js (18+) and has no external dependencies. No node_modules, no build steps!
+**Zero Dependencies** - This project runs with just Bun and has no external dependencies. No node_modules, no build steps, native TypeScript!
 
 ## Quick Start
 
 For developers who just downloaded this repository:
 
 ```bash
-# 1. Clone the repository
+# 1. Install Bun (one-time, if not already installed)
+curl -fsSL https://bun.sh/install | bash
+
+# 2. Clone the repository
 git clone <repo-url>
 cd mockery
 
-# 2. Start the server (no installation needed!)
-node server/index.js
+# 3. Start the server (no other installation needed!)
+bun run server/index.ts
 
-# 3. Load the Chrome extension
+# 4. Load the Chrome extension
 # - Go to chrome://extensions/
 # - Enable "Developer mode"
 # - Click "Load unpacked" and select this folder
@@ -32,19 +35,23 @@ node server/index.js
 ### Server Operations
 ```bash
 # Start the mock server (default port 8756)
-node server/index.js
+bun run server/index.ts
 
 # Start with custom port
-node server/index.js 9000
+bun run server/index.ts 9000
 
 # Start with custom config file
-node server/index.js --config ./my-mocks.js
+bun run server/index.ts --config ./my-mocks.ts
 
-# Auto-restart server on changes (Node.js 18+)
-node --watch server/index.js
+# Auto-restart server on changes
+bun --watch run server/index.ts
+
+# Using package.json scripts
+bun start          # same as bun run server/index.ts
+bun run dev        # same as bun --watch run server/index.ts
 
 # Stop the server (if needed)
-pkill -f 'node.*server/index.js'
+pkill -f 'bun.*server/index.ts'
 ```
 
 ### Extension Development
@@ -54,7 +61,7 @@ pkill -f 'node.*server/index.js'
 4. Reload test pages to see changes
 
 **Refreshing Rules:**
-- Edit `mocks/config.js` or add/modify files in `mocks/` folder
+- Edit `mocks/config.ts` or add/modify files in `mocks/` folder
 - Click "Refresh Rules" in the extension popup to update both JavaScript and declarativeNetRequest rules
 - Or restart the server to automatically refresh rules on next page load
 
@@ -71,12 +78,12 @@ The extension uses a **hybrid architecture** that intercepts different types of 
 1. **JavaScript Requests** (fetch/XMLHttpRequest)
    - **MAIN-world Script** (`injector.js`) - patches `window.fetch()` and `XMLHttpRequest.prototype`
    - **ISOLATED-world Bridge** (`bridge.js`) - bridges to background service worker
-   - **Background Service Worker** (`background.js`) - fetches from Node server
+   - **Background Service Worker** (`background.js`) - fetches from Bun server
 
 2. **HTML Resource Requests** (img tags, CSS, script tags)
    - **declarativeNetRequest API** - intercepts at network layer
-   - **Dynamic Rule Generation** - converts mocks/config.js to Chrome rules
-   - **Redirect to Server** - routes to same Node.js companion server
+   - **Dynamic Rule Generation** - converts mocks/config.ts to Chrome rules
+   - **Redirect to Server** - routes to same Bun companion server
 
 ### Message Flow Examples
 
@@ -86,7 +93,7 @@ fetch("https://api.example.com/users")
   → injector.js (MAIN world) checks rules
   → postMessage to bridge.js (ISOLATED world)
   → chrome.runtime.sendMessage to background.js
-  → fetch from Node server (localhost:8756)
+  → fetch from Bun server (localhost:8756)
   → response back through chain
   → synthesized Response object returned to page
 ```
@@ -96,7 +103,7 @@ fetch("https://api.example.com/users")
 <img src="https://example.com/logo.svg">
   → declarativeNetRequest rule matches pattern
   → redirects to http://localhost:8756/resolve?url=https://example.com/logo.svg
-  → Node server returns mock file content
+  → Bun server returns mock file content
   → browser displays mock content
 ```
 
@@ -106,8 +113,8 @@ fetch("https://api.example.com/users")
 - **declarativeNetRequest** handles HTML resources (img, css, script tags) that can't be intercepted by JavaScript patches
 - **ISOLATED world bridge** provides Chrome API access from MAIN world
 - **Background service worker** enables localhost communication without CORS
-- **Node server** provides file-based mock management and MIME detection
-- **Node server** is required because Chrome extensions cannot read arbitrary local files
+- **Bun server** provides file-based mock management and MIME detection
+- **Bun server** is required because Chrome extensions cannot read arbitrary local files
 
 ## Configuration Management
 
@@ -117,15 +124,16 @@ Rules are managed through direct file system manipulation:
 
 1. **Create mock files** in the `mocks/` folder (or subfolders)
 2. **Create handler functions** in the `mocks/handlers/` folder (optional)
-3. **Edit `mocks/config.js`** to add URL patterns, file paths, and handlers (inline or imported)
-4. **Server hot-reloads** configuration when `mocks/config.js` or handler files change
+3. **Edit `mocks/config.ts`** to add URL patterns, file paths, and handlers (inline or imported)
+4. **Server hot-reloads** configuration when `mocks/config.ts` or handler files change
 
 ### Configuration File
 
-`mocks/config.js` format (JavaScript module):
-```javascript
-// HTTP Request Mocker Configuration
-module.exports = [
+`mocks/config.ts` format (TypeScript module with ESM exports):
+```typescript
+import type { MockRule } from '../server/index.ts';
+
+export default [
   {
     pattern: "https://api.example.com/users",
     file: "users.json",
@@ -148,30 +156,33 @@ module.exports = [
   {
     pattern: "https://api.example.com/enhanced",
     file: "users.json",
-    handler: require('./handlers/modify-response.js'), // Import handler
+    handler: (await import('./handlers/modify-response.ts')).default,
   },
   {
     pattern: ".*\\.example\\.com.*address-book.*",
     file: "api/address-book.json",
     isRegex: true
   }
-];
+] satisfies MockRule[];
 ```
 
 ### Handler Functions
 
 Handler functions allow dynamic response generation and modification with three approaches:
 
-- **Inline Functions**: Define handlers directly in `config.js`
-- **Imported Modules**: Import handlers using `require('./handlers/file.js')`
-- **File Path Strings**: Reference handler files by path (legacy support)
+- **Inline Functions**: Define handlers directly in `config.ts`
+- **Imported Modules**: Import handlers using `import` (ESM)
+- **File Path Strings**: Reference handler files by path (resolved at runtime)
 - **Function signature**: `async (request, originalResponse) => responseObject`
 - **Hot reload**: Configuration and handler files reload automatically
 - **Combination**: Can be used with `file` to modify existing responses
+- **Type safety**: Import `HandlerFunction` type for full autocomplete
 
 **Inline Handler Example:**
-```javascript
-module.exports = [
+```typescript
+import type { MockRule } from '../server/index.ts';
+
+export default [
   {
     pattern: "https://api.example.com/time",
     handler: async (request) => ({
@@ -183,20 +194,32 @@ module.exports = [
       })
     })
   }
-];
+] satisfies MockRule[];
 ```
 
 **Imported Handler Example:**
-```javascript
-// config.js
-const dynamicHandler = require('./handlers/dynamic.js');
+```typescript
+import dynamicHandler from './handlers/dynamic-response.ts';
+import type { MockRule } from '../server/index.ts';
 
-module.exports = [
+export default [
   {
     pattern: "https://api.example.com/dynamic",
     handler: dynamicHandler
   }
-];
+] satisfies MockRule[];
+```
+
+**Handler File Example:**
+```typescript
+import type { HandlerFunction } from '../../server/index.ts';
+import { success } from './utils/common-responses.ts';
+
+const handler: HandlerFunction = async (request, originalResponse) => {
+  return success({ message: 'Hello', url: request.url });
+};
+
+export default handler;
 ```
 
 ### File Path Resolution
@@ -204,7 +227,7 @@ module.exports = [
 Relative paths in rules are resolved as follows:
 - Simple filenames (e.g. `"users.json"`) automatically resolve to `mocks/users.json`
 - Paths with directories (e.g. `"api/users.json"`) resolve to `mocks/api/users.json`
-- Paths starting with `./` or `../` are resolved relative to `mocks/config.js` location
+- Paths starting with `./` or `../` are resolved relative to `mocks/config.ts` location
 - Absolute paths are used as-is
 
 ### Folder Organization
@@ -212,16 +235,17 @@ Relative paths in rules are resolved as follows:
 The `mocks/` folder can be organized however you prefer:
 ```
 mocks/
-├── config.js           # Main configuration file (JavaScript module)
+├── config.ts           # Main configuration file (TypeScript module)
 ├── api/
 │   ├── users.json
 │   └── auth/
 │       └── token.json
-├── handlers/           # JavaScript handler files
-│   ├── search-filter.js
-│   ├── dynamic-response.js
+├── handlers/           # TypeScript handler files
+│   ├── search-filter.ts
+│   ├── dynamic-response.ts
+│   ├── modify-response.ts
 │   └── utils/
-│       └── common-responses.js
+│       └── common-responses.ts
 ├── images/
 │   ├── logo.svg
 │   └── avatar.png
@@ -242,7 +266,7 @@ Mock server auto-detects content-type for a wide range of file types:
 - `.json` → `application/json`
 - `.html`, `.htm` → `text/html`
 - `.xml` → `application/xml`
-- `.js` → `application/javascript`
+- `.js`, `.ts` → `application/javascript`
 - `.css` → `text/css`
 - `.csv` → `text/csv`
 - `.txt` → `text/plain`
@@ -296,7 +320,7 @@ The extension properly handles binary files (images, PDFs, fonts, archives) by:
 ## Server API Endpoints
 
 - `GET /health` — Server status and rule count
-- `GET /rules` — List all rules from mocks/config.js
+- `GET /rules` — List all rules from mocks/config.ts
 - `GET /resolve?url=<encoded>&method=<method>` — Resolve mock for URL (used by extension)
 - `GET /resolve-pattern?pattern=<encoded>` — Resolve mock by pattern (used by declarativeNetRequest)
 - `GET /events` — SSE stream for hot reload notifications
@@ -310,7 +334,7 @@ The handler functionality can be tested directly through the mock server endpoin
 
 ```bash
 # Start the server
-node server/index.js
+bun run server/index.ts
 
 # Test static file response
 curl "http://localhost:8756/resolve?url=https://api.example.com/users"
@@ -341,12 +365,13 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 - Return detailed error messages during development for easier troubleshooting
 - Test both with and without original file responses
 - Validate handler response format (status, headers, body)
+- Import `HandlerFunction` type for autocomplete and type checking
 
 ## Important Notes
 
 ### Extension Permissions
 - `storage` — for persisting enabled state and server URL
-- `host_permissions: ["http://localhost/*"]` — for communicating with Node server
+- `host_permissions: ["http://localhost/*"]` — for communicating with Bun server
 - `declarativeNetRequest` — for intercepting HTML resource requests
 
 ### Security Considerations
@@ -359,7 +384,7 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 - MAIN world logs: Open page console, look for `[Mockery]`
 - ISOLATED world logs: Open page console, look for `[Mockery] ISOLATED bridge loaded`
 - Background logs: Go to `chrome://extensions/` → "service worker" link
-- Server logs: Watch terminal where `node server/index.js` is running
+- Server logs: Watch terminal where `bun run server/index.ts` is running
 - Activity tracking: Check "Activity" tab in extension popup
 
 ## File Structure
@@ -372,21 +397,22 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 ├── injector.js            # MAIN-world request interceptor
 ├── popup.html/js/css      # Extension popup UI
 ├── server/
-│   └── index.js           # Node.js companion server (zero dependencies!)
+│   └── index.ts           # Bun companion server (TypeScript, zero dependencies!)
 └── mocks/                 # Mock response files (organize as needed)
-    ├── config.js          # Server configuration (JavaScript module)
-    └── handlers/          # JavaScript handler functions
+    ├── config.ts          # Server configuration (TypeScript module)
+    └── handlers/          # TypeScript handler functions
 ```
 
 ## Distribution Benefits
 
 This setup provides the ultimate simplicity for developers:
 
-✅ **No build steps** - Everything runs directly
-✅ **No dependencies** - Works with just Node.js 18+
-✅ **No package managers** - No npm, yarn, or bun needed
-✅ **No compilation** - Pure JavaScript, ready to run
-✅ **Instant setup** - Clone and run in seconds
-✅ **Zero configuration** - Works out of the box
+- **No build steps** - Bun runs TypeScript directly
+- **No dependencies** - Works with just Bun installed
+- **No package managers** - No npm install needed
+- **No compilation** - TypeScript runs natively
+- **Type safety** - Full autocomplete and type checking in handlers/config
+- **Instant setup** - Install Bun once, then clone and run
+- **Zero configuration** - Works out of the box
 
 Perfect for quick demos, testing, development tools, and sharing with team members who just want it to work immediately!
