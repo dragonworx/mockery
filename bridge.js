@@ -555,13 +555,8 @@ function showToast(url, file, type = 'success', errorInfoOrMessage = null, encod
       : '';
     toast.innerHTML = `
       ${closeBtn}
-      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;margin-bottom:4px;${hasHandlerLogs ? 'padding-right:18px;' : ''}">
-        <span style="color:${mutedColor};">${escapeHtml(origin)}</span><span style="font-weight:600;color:${textColor};">${escapeHtml(path)}</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:14px;">${icon}</span>
-        <span style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:${accentColor};">${label}</span>
-        <span style="font-size:12px;color:${mutedColor};">→ ${escapeHtml(file || 'stub')}</span>
+      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;${hasHandlerLogs ? 'padding-right:18px;' : ''}">
+        <span style="font-weight:600;color:${textColor};">${escapeHtml(path)}</span>
       </div>
       ${logsHtml}
     `;
