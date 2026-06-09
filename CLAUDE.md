@@ -61,7 +61,7 @@ pkill -f 'bun.*server/index.ts'
 4. Reload test pages to see changes
 
 **Refreshing Rules:**
-- Edit `mocks/.config.ts` or add/modify files in `mocks/` folder
+- Edit `.config/rules.ts` or add/modify files in `mocks/` folder
 - Click "Refresh Rules" in the extension popup to update both JavaScript and declarativeNetRequest rules
 - Or restart the server to automatically refresh rules on next page load
 
@@ -82,7 +82,7 @@ The extension uses a **hybrid architecture** that intercepts different types of 
 
 2. **HTML Resource Requests** (img tags, CSS, script tags)
    - **declarativeNetRequest API** - intercepts at network layer
-   - **Dynamic Rule Generation** - converts mocks/.config.ts to Chrome rules
+   - **Dynamic Rule Generation** - converts .config/rules.ts to Chrome rules
    - **Redirect to Server** - routes to same Bun companion server
 
 ### Message Flow Examples
@@ -118,18 +118,26 @@ fetch("https://api.example.com/users")
 
 ## Configuration Management
 
-### Manual File System Approach
+### File Layout
+
+The project separates configuration from mock data:
+
+- `.config/` — versioned configuration (committed to git)
+  - `rules.ts` — rule definitions (URL patterns, file mappings, handlers)
+  - `rule-overrides.json` — persisted enable/disable toggle state
+  - `handlers/` — reusable handler function modules
+- `mocks/` — stub/mock payloads only (gitignored, local-only)
 
 Rules are managed through direct file system manipulation:
 
 1. **Create mock files** in the `mocks/` folder (or subfolders)
-2. **Create handler functions** in the `mocks/handlers/` folder (optional)
-3. **Edit `mocks/.config.ts`** to add URL patterns, file paths, and handlers (inline or imported)
-4. **Server hot-reloads** configuration when `mocks/.config.ts` or handler files change
+2. **Create handler functions** in the `.config/handlers/` folder (optional)
+3. **Edit `.config/rules.ts`** to add URL patterns, file paths, and handlers (inline or imported)
+4. **Server hot-reloads** configuration when `.config/rules.ts` or handler files change
 
 ### Configuration File
 
-`mocks/.config.ts` format (TypeScript module with ESM exports):
+`.config/rules.ts` format (TypeScript module with ESM exports):
 ```typescript
 import type { MockRule } from '../server/index.ts';
 
@@ -170,9 +178,9 @@ export default [
 
 Handler functions allow dynamic response generation and modification with three approaches:
 
-- **Inline Functions**: Define handlers directly in `.config.ts`
+- **Inline Functions**: Define handlers directly in `rules.ts`
 - **Imported Modules**: Import handlers using `import` (ESM)
-- **File Path Strings**: Reference handler files by path (resolved at runtime)
+- **File Path Strings**: Reference handler files by path (resolved at runtime, relative to `.config/`)
 - **Function signature**: `async (request, originalResponse) => responseObject`
 - **Hot reload**: Configuration and handler files reload automatically
 - **Combination**: Can be used with `file` to modify existing responses
@@ -210,7 +218,7 @@ export default [
 ] satisfies MockRule[];
 ```
 
-**Handler File Example:**
+**Handler File Example** (`.config/handlers/example.ts`):
 ```typescript
 import type { HandlerFunction } from '../../server/index.ts';
 import { success } from './utils/common-responses.ts';
@@ -227,25 +235,29 @@ export default handler;
 Relative paths in rules are resolved as follows:
 - Simple filenames (e.g. `"users.json"`) automatically resolve to `mocks/users.json`
 - Paths with directories (e.g. `"api/users.json"`) resolve to `mocks/api/users.json`
-- Paths starting with `./` or `../` are resolved relative to `mocks/.config.ts` location
+- Paths starting with `./` or `../` are resolved relative to `.config/rules.ts` location
 - Absolute paths are used as-is
+- Handler file path strings are resolved relative to `.config/`
 
 ### Folder Organization
 
-The `mocks/` folder can be organized however you prefer:
+The `mocks/` folder is for stubs/mocks only and is gitignored. Organize it however you prefer:
 ```
-mocks/
-├── .config.ts           # Main configuration file (TypeScript module)
+.config/
+├── rules.ts             # Main configuration file (TypeScript module)
+├── rule-overrides.json  # Persisted enable/disable toggle state
+└── handlers/            # TypeScript handler files
+    ├── search-filter.ts
+    ├── dynamic-response.ts
+    ├── modify-response.ts
+    └── utils/
+        └── common-responses.ts
+
+mocks/                  # Stubs/mocks only (gitignored)
 ├── api/
 │   ├── users.json
 │   └── auth/
 │       └── token.json
-├── handlers/           # TypeScript handler files
-│   ├── search-filter.ts
-│   ├── dynamic-response.ts
-│   ├── modify-response.ts
-│   └── utils/
-│       └── common-responses.ts
 ├── images/
 │   ├── logo.svg
 │   └── avatar.png
@@ -320,7 +332,7 @@ The extension properly handles binary files (images, PDFs, fonts, archives) by:
 ## Server API Endpoints
 
 - `GET /health` — Server status and rule count
-- `GET /rules` — List all rules from mocks/.config.ts
+- `GET /rules` — List all rules from .config/rules.ts
 - `GET /resolve?url=<encoded>&method=<method>` — Resolve mock for URL (used by extension)
 - `GET /resolve-pattern?pattern=<encoded>` — Resolve mock by pattern (used by declarativeNetRequest)
 - `GET /events` — SSE stream for hot reload notifications
@@ -354,7 +366,7 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 
 ### Development Workflow
 
-1. **Create/modify handler**: Edit files in `mocks/handlers/`
+1. **Create/modify handler**: Edit files in `.config/handlers/`
 2. **Save changes**: Handler automatically reloads (via built-in fs.watch)
 3. **Test immediately**: Use curl or refresh browser page
 4. **Check logs**: Server console shows handler execution and errors
@@ -398,9 +410,11 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 ├── popup.html/js/css      # Extension popup UI
 ├── server/
 │   └── index.ts           # Bun companion server (TypeScript, zero dependencies!)
-└── mocks/                 # Mock response files (organize as needed)
-    ├── .config.ts          # Server configuration (TypeScript module)
-    └── handlers/          # TypeScript handler functions
+├── .config/               # Versioned configuration (committed)
+│   ├── rules.ts           # Rule definitions (TypeScript module)
+│   ├── rule-overrides.json # Persisted enable/disable state
+│   └── handlers/          # TypeScript handler functions
+└── mocks/                 # Mock/stub payloads (gitignored, local-only)
 ```
 
 ## Distribution Benefits

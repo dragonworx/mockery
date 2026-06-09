@@ -60,11 +60,19 @@ That's it. No `npm install`, no build step, no configuration ceremony.
 
 ## Configuration
 
-All mocking rules live in `mocks/config.js`:
+Configuration lives in the versioned `.config/` folder, separate from your mock payloads:
 
-```javascript
-module.exports = [
-  // Static file response
+- `.config/rules.ts` — rule definitions (URL patterns, file mappings, handlers)
+- `.config/rule-overrides.json` — persisted enable/disable toggle state
+- `.config/handlers/` — optional reusable handler modules
+- `mocks/` — stub/mock response payloads (gitignored)
+
+```typescript
+// .config/rules.ts
+import type { MockRule } from '../server/index.ts';
+
+export default [
+  // Static file response (resolved against mocks/)
   {
     pattern: "https://api.example.com/users",
     file: "users.json"
@@ -91,9 +99,9 @@ module.exports = [
   {
     pattern: "https://api.example.com/enhanced",
     file: "users.json",
-    handler: require("./handlers/modify-response.js")
+    handler: (await import('./handlers/modify-response.ts')).default,
   }
-];
+] satisfies MockRule[];
 ```
 
 ### Rule Options
@@ -115,10 +123,10 @@ module.exports = [
 
 ```bash
 npm start                                  # Default port 8756
-node server/index.js                       # Same as above
-node server/index.js 9000                  # Custom port
-node server/index.js --config ./custom.js  # Custom config path
-node --watch server/index.js               # Auto-restart on changes (Node 18+)
+bun run server/index.ts                    # Same as above
+bun run server/index.ts 9000               # Custom port
+bun run server/index.ts --config ./custom.ts  # Custom config path
+bun --watch run server/index.ts            # Auto-restart on changes
 ```
 
 ### Endpoints
@@ -137,9 +145,11 @@ node --watch server/index.js               # Auto-restart on changes (Node 18+)
 
 Handlers receive a request object and an optional original file response, then return a response object:
 
-```javascript
-// mocks/handlers/example.js
-module.exports = async (request, originalResponse) => {
+```typescript
+// .config/handlers/example.ts
+import type { HandlerFunction } from '../../server/index.ts';
+
+const handler: HandlerFunction = async (request, originalResponse) => {
   // request: { url, method, headers, body, query, timestamp }
   // originalResponse: { status, headers, body } (if file is also specified)
 
@@ -149,6 +159,8 @@ module.exports = async (request, originalResponse) => {
     body: JSON.stringify({ message: "Hello from handler" })
   };
 };
+
+export default handler;
 ```
 
 Handlers hot-reload automatically when saved (uses built-in `fs.watch` — no dependencies needed).
@@ -159,8 +171,8 @@ Handlers hot-reload automatically when saved (uses built-in `fs.watch` — no de
 
 Mockery supports live reloading without restarting anything:
 
-- **Config changes** (`mocks/config.js`) - detected via `fs.watch`, broadcast to the extension over SSE
-- **Handler changes** (`mocks/handlers/**/*.js`) - detected via `fs.watch`, reloaded instantly
+- **Config changes** (`.config/rules.ts`) - detected via `fs.watch`, broadcast to the extension over SSE
+- **Handler changes** (`.config/handlers/**/*.ts`) - detected via `fs.watch`, reloaded instantly
 - **Mock file changes** - served fresh on every request (no caching)
 
 The extension popup also has a **Refresh Rules** button for manual reloads.

@@ -4,11 +4,11 @@
  * Powered by Bun.
  *
  * Usage:
- *   bun run server/index.ts                    # reads mocks/.config.ts from cwd
+ *   bun run server/index.ts                    # reads .config/rules.ts from cwd
  *   bun run server/index.ts 9000               # custom port
  *   bun run server/index.ts --config ./my-mocks.ts   # custom config path
  *
- * Config format (mocks/.config.ts):
+ * Config format (.config/rules.ts):
  *   export default [
  *     { pattern: "https://api.example.com/users", file: "users.json" },
  *     { pattern: "https://api.example.com/dynamic", handler: async (req) => ({ status: 200, body: "Hi" }) },
@@ -22,7 +22,7 @@
  *   - Absolute paths are used as-is
  *
  * Handler functions:
- *   - "handler": "handlers/dynamic.ts" resolves to "mocks/handlers/dynamic.ts"
+ *   - "handler": "handlers/dynamic.ts" resolves to ".config/handlers/dynamic.ts"
  *   - Handlers receive (request, originalResponse) and return response object
  *   - Hot reloading via built-in fs.watch (no dependencies needed)
  *   - Can be combined with file to modify existing response
@@ -70,14 +70,14 @@ interface CachedHandler {
 const handlerCache = new Map<string, CachedHandler>();
 
 // Enable hot reload for handlers using built-in fs.watch (recursive supported on macOS/Windows)
-const handlersPath = join(process.cwd(), 'mocks', 'handlers');
+const handlersPath = join(process.cwd(), '.config', 'handlers');
 if (existsSync(handlersPath)) {
   try {
     watch(handlersPath, { recursive: true }, (_eventType, filename) => {
       if (!filename || !filename.endsWith('.ts')) return;
       const filePath = join(handlersPath, filename);
 
-      console.log(`[mockery] Handler changed: mocks/handlers/${filename}`);
+      console.log(`[mockery] Handler changed: .config/handlers/${filename}`);
 
       // Clear from cache
       handlerCache.delete(filePath);
@@ -91,7 +91,7 @@ if (existsSync(handlersPath)) {
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 let port = 8756;
-let configPath = join(process.cwd(), 'mocks', '.config.ts');
+let configPath = join(process.cwd(), '.config', 'rules.ts');
 
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
@@ -103,7 +103,13 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 
 // ── Rule overrides persistence ──────────────────────────────────────────────
-const overridesPath = join(dirname(configPath), '.rule-overrides.json');
+// Overrides are keyed by a stable rule identity (`${method}:${pattern}`) rather
+// than array index, so reordering rules in rules.ts preserves toggle state.
+const overridesPath = join(dirname(configPath), 'rule-overrides.json');
+
+function ruleKey(rule: MockRule): string {
+  return `${(rule.method || '*').toUpperCase()}:${rule.pattern}`;
+}
 
 function loadOverrides(): Record<string, boolean> {
   try {
@@ -118,12 +124,41 @@ function saveOverrides(obj: Record<string, boolean>): void {
   writeFileSync(overridesPath, JSON.stringify(obj, null, 2));
 }
 
-function applyOverrides(): void {
-  const overrides = loadOverrides();
+/**
+ * Migrate legacy index-keyed overrides (e.g. `{ "1": true }`) to the new
+ * stable key format (e.g. `{ "GET:/foo": true }`). Returns the (possibly
+ * rewritten) overrides object and persists the upgraded form on disk.
+ */
+function migrateOverrides(overrides: Record<string, boolean>): Record<string, boolean> {
+  const keys = Object.keys(overrides);
+  if (keys.length === 0) return overrides;
+
+  const allNumeric = keys.every(k => /^\d+$/.test(k));
+  if (!allNumeric) return overrides;
+
+  const migrated: Record<string, boolean> = {};
+  let migratedAny = false;
   for (const [index, enabled] of Object.entries(overrides)) {
-    const i = Number(index);
-    if (rules[i]) {
-      rules[i].enabled = enabled;
+    const rule = rules[Number(index)];
+    if (rule) {
+      migrated[ruleKey(rule)] = enabled;
+      migratedAny = true;
+    }
+  }
+
+  if (migratedAny) {
+    saveOverrides(migrated);
+    console.log('[mockery] Migrated rule-overrides.json from index-based to pattern-based keys');
+  }
+  return migrated;
+}
+
+function applyOverrides(): void {
+  const overrides = migrateOverrides(loadOverrides());
+  for (const rule of rules) {
+    const key = ruleKey(rule);
+    if (key in overrides) {
+      rule.enabled = overrides[key];
     }
   }
 }
@@ -189,8 +224,8 @@ async function loadHandler(handlerOrPath: HandlerFunction | string): Promise<Han
     return handlerOrPath;
   }
 
-  // Otherwise, treat it as a file path
-  const fullPath = resolve('mocks', handlerOrPath);
+  // Otherwise, treat it as a file path (relative to .config/)
+  const fullPath = resolve('.config', handlerOrPath);
 
   try {
     // Check if handler is cached and file hasn't changed
@@ -712,9 +747,10 @@ const server = Bun.serve({
       const enabled = payload.enabled !== false;
       rules[index].enabled = enabled;
 
-      // Persist to overrides file
+      // Persist to overrides file keyed by stable rule identity, so reordering
+      // rules in rules.ts doesn't lose the toggle state.
       const overrides = loadOverrides();
-      overrides[String(index)] = enabled;
+      overrides[ruleKey(rules[index])] = enabled;
       saveOverrides(overrides);
 
       // Broadcast so SSE listeners (background.js) pick up the change
@@ -735,7 +771,7 @@ console.log(`[mockery] Config: ${configPath}`);
 console.log(`[mockery] Endpoints:`);
 console.log(`  GET /resolve?url=<encoded>       — serve a matched mock`);
 console.log(`  GET /resolve-pattern?pattern=<>  — serve mock by pattern (for declarativeNetRequest)`);
-console.log(`  GET /rules                       — list current rules from mocks/.config.ts`);
+console.log(`  GET /rules                       — list current rules from .config/rules.ts`);
 console.log(`  GET /events                      — SSE stream for hot reload`);
 console.log(`  GET /health                      — server status`);
 

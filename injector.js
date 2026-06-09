@@ -195,10 +195,6 @@
     const rule = findMatch(url, method);
 
     if (rule) {
-      if (shouldLog('info')) {
-        const [pBold, pReset] = prefixStyles('info');
-        console.log(`%c[Mockery]%c ${method} %c${url}%c — %crule matched%c, requesting mock…`, pBold, pReset, 'color:#06b6d4', 'color:inherit', 'color:#10b981;font-weight:bold', 'color:inherit');
-      }
       // Extract body as string when possible (most APIs send JSON strings or Blobs)
       let bodyForServer = null;
       try {
