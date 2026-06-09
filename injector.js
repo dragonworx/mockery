@@ -161,15 +161,22 @@
     if (!encoded) return;
     const decoded = decodeHandlerLogs(encoded);
     if (!decoded || !Array.isArray(decoded.logs) || decoded.logs.length === 0) return;
-    const label = `%c[Mockery handler]%c ${decoded.handler || 'handler'} %c${url}`;
-    const styles = ['color:#8b5cf6;font-weight:bold', 'color:inherit', 'color:#06b6d4'];
-    try { console.groupCollapsed(label, ...styles); } catch { /* ignore */ }
+    const levelColors = {
+      log:   { fg: '#475569', bg: '#f1f5f9' },
+      info:  { fg: '#1e40af', bg: '#dbeafe' },
+      warn:  { fg: '#92400e', bg: '#fef3c7' },
+      error: { fg: '#991b1b', bg: '#fee2e2' },
+      debug: { fg: '#3730a3', bg: '#e0e7ff' },
+    };
     for (const entry of decoded.logs) {
       const fn = (console[entry.level] || console.log).bind(console);
-      try { fn(...(entry.args || []).map(reviveLogArg)); }
+      const args = (entry.args || []).map(reviveLogArg);
+      const c = levelColors[entry.level] || levelColors.log;
+      const tag = `%c[${entry.level.toUpperCase()}]%c`;
+      const tagStyles = [`color:${c.fg};font-weight:bold;background:${c.bg};padding:1px 4px;border-radius:3px`, 'color:inherit'];
+      try { fn(tag, ...tagStyles, ...args); }
       catch { try { fn('[Mockery] failed to replay log', entry); } catch { /* swallow */ } }
     }
-    try { console.groupEnd(); } catch { /* ignore */ }
   }
 
   // ── Patch fetch() ────────────────────────────────────────────────────
