@@ -85,180 +85,6 @@
     "controlTracking": {
       "controls": [
         {
-          "controlId": "address-book-add-recipient--button",
-          "trigger": "click",
-          "xdm": {
-            "eventType": "web.webinteraction.linkClicks",
-            "_commonwealthbankau": {
-              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
-              "additionalpageinfo": {
-                "UAI": "{SC_UAI}",
-                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
-                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
-                "subSectionDetail": "",
-                "subSubSectionDetail": ""
-              },
-              "customer": {
-                "UUIDv4": "{SC_UUIDv4}",
-                "UUIDv5": "{SC_UUIDv5}",
-                "authenticationState": "{SC_authstate}",
-                "customerProfileType": "",
-                "customerSubType": "",
-                "customerType": ""
-              },
-              "error": { "errorMessage": "", "errorType": "" },
-              "form": {},
-              "interaction": { "interactionName": "add-recipient" },
-              "marketing": {
-                "countingMethod": "select",
-                "enableGa4": "false",
-                "enableFloodLight": "false",
-                "enableConditionalTagging": "false",
-                "floodLightConfigID": "select",
-                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
-                "ga4EventName": "page_view",
-                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
-              },
-              "merchant": {},
-              "milestone": {},
-              "onlineApplication": {},
-              "page": {
-                "channel": "{SC_channel}",
-                "page": "address-book",
-                "pageType": "",
-                "pageURL": "{SC_pageurl}",
-                "previousPageName": "{SC_previouspagename}",
-                "section": "banking",
-                "site": "nb",
-                "subSection": "payments",
-                "subSubSection": "payment-settings",
-                "subSubSubsection": ""
-              },
-              "personalisation": {},
-              "product": { "featureId": "", "productId": [] },
-              "tools": {},
-              "trackingDetails": {
-                "ECID": "{SC_ecid}",
-                "adobeAnalyticsVersion": "{SC_analyticsversion}",
-                "hourOfDay": "{SC_hourOfDay}",
-                "dayOfWeek": "{SC_dayOfWeek}",
-                "newVSrepeat": "{SC_newVSrepeat}",
-                "internalVSexternal": "{SC_internalVSexternal}"
-              },
-              "webChat": { "webChatEnabled": false }
-            },
-            "commerce": {},
-            "web": {
-              "webInteraction": {
-                "URL": "{SC_interactionURL}",
-                "name": "nb:banking:payments:payment-settings:address-book:add-recipient",
-                "type": "other",
-                "linkClicks": { "value": 1 }
-              },
-              "webPageDetails": {
-                "URL": "{SC_pageurl}",
-                "name": "nb:banking:address-book"
-              },
-              "webReferrer": { "URL": "{SC_referrerurl}" }
-            }
-          },
-          "webChat": { "enabled": false, "value": "", "params": "" },
-          "linkName": {
-            "value": "nb:banking:payments:payment-settings:address-book:add-recipient",
-            "dynamic": false
-          }
-        },
-        {
-          "controlId": "address-book--filter-tabs-bsb",
-          "trigger": "click",
-          "xdm": {
-            "eventType": "web.webinteraction.linkClicks",
-            "_commonwealthbankau": {
-              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
-              "additionalpageinfo": {
-                "UAI": "{SC_UAI}",
-                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
-                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
-                "subSectionDetail": "",
-                "subSubSectionDetail": ""
-              },
-              "customer": {
-                "UUIDv4": "{SC_UUIDv4}",
-                "UUIDv5": "{SC_UUIDv5}",
-                "authenticationState": "{SC_authstate}",
-                "customerProfileType": "",
-                "customerSubType": "",
-                "customerType": ""
-              },
-              "error": { "errorMessage": "", "errorType": "" },
-              "form": {},
-              "interaction": {
-                "interactionDetailName": "SC_PAYEE_TYPE",
-                "interactionDetailValue": "{SC_PAYEE_TYPE}",
-                "interactionName": "filter-tabs-bsb"
-              },
-              "marketing": {
-                "countingMethod": "select",
-                "enableGa4": "false",
-                "enableFloodLight": "false",
-                "enableConditionalTagging": "false",
-                "enableMultiOperator": "false",
-                "floodLightConfigID": "select",
-                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
-                "ga4EventName": "page_view",
-                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
-              },
-              "merchant": {},
-              "milestone": {},
-              "onlineApplication": {},
-              "page": {
-                "channel": "{SC_channel}",
-                "page": "address-book",
-                "pageType": "",
-                "pageURL": "{SC_pageurl}",
-                "previousPageName": "{SC_previouspagename}",
-                "section": "banking",
-                "site": "nb",
-                "subSection": "payments",
-                "subSubSection": "payment-settings",
-                "subSubSubsection": "",
-                "bladeName": "address-book"
-              },
-              "personalisation": {},
-              "product": { "featureId": "", "productId": [] },
-              "tools": {},
-              "trackingDetails": {
-                "ECID": "{SC_ecid}",
-                "adobeAnalyticsVersion": "{SC_analyticsversion}",
-                "hourOfDay": "{SC_hourOfDay}",
-                "dayOfWeek": "{SC_dayOfWeek}",
-                "newVSrepeat": "{SC_newVSrepeat}",
-                "internalVSexternal": "{SC_internalVSexternal}"
-              },
-              "webChat": { "webChatEnabled": false }
-            },
-            "commerce": {},
-            "web": {
-              "webInteraction": {
-                "URL": "{SC_interactionURL}",
-                "name": "nb:banking:payments:payment-settings:address-book:filter-tabs-bsb",
-                "type": "other",
-                "linkClicks": { "value": 1 }
-              },
-              "webPageDetails": {
-                "URL": "{SC_pageurl}",
-                "name": "nb:banking:address-book"
-              },
-              "webReferrer": { "URL": "{SC_referrerurl}" }
-            }
-          },
-          "webChat": { "enabled": false, "value": "", "params": "" },
-          "linkName": {
-            "value": "nb:banking:payments:payment-settings:address-book:filter-tabs-bsb",
-            "dynamic": false
-          }
-        },
-        {
           "controlId": "address-book--filter-all",
           "trigger": "click",
           "xdm": {
@@ -1117,6 +943,1088 @@
             "value": "nb:banking:payments:payment-settings:address-book:import",
             "dynamic": false
           }
+        },
+        {
+          "controlId": "delete-recipient-confirm",
+          "trigger": "load",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "delete-recipient-confirm"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_pageurl}",
+                "name": "address-book",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": { "value": "", "dynamic": false }
+        },
+        {
+          "controlId": "delete-recipient-confirm--delete",
+          "trigger": "click",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "interaction": { "interactionName": "delete" },
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "delete-recipient-confirm"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_interactionURL}",
+                "name": "nb:banking:payments:payment-settings:address-book:delete",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": {
+            "value": "nb:banking:payments:payment-settings:address-book:delete",
+            "dynamic": false
+          }
+        },
+        {
+          "controlId": "delete-recipient-confirm--cancel",
+          "trigger": "click",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "interaction": { "interactionName": "cancel" },
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "delete-recipient-confirm"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_interactionURL}",
+                "name": "nb:banking:payments:payment-settings:address-book:cancel",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": {
+            "value": "nb:banking:payments:payment-settings:address-book:cancel",
+            "dynamic": false
+          }
+        },
+        {
+          "controlId": "delete-recipient-error",
+          "trigger": "load",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "delete-recipient-error"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_pageurl}",
+                "name": "address-book",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": { "value": "", "dynamic": false }
+        },
+        {
+          "controlId": "import-success",
+          "trigger": "load",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "import-success"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_pageurl}",
+                "name": "address-book",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": { "value": "", "dynamic": false }
+        },
+        {
+          "controlId": "add-recipient-success",
+          "trigger": "load",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "add-recipient-success"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_pageurl}",
+                "name": "address-book",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": { "value": "", "dynamic": false }
+        },
+        {
+          "controlId": "edit-recipient-success",
+          "trigger": "load",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "edit-recipient-success"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_pageurl}",
+                "name": "address-book",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": { "value": "", "dynamic": false }
+        },
+        {
+          "controlId": "delete-recipient-success",
+          "trigger": "load",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "delete-recipient-success"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_pageurl}",
+                "name": "address-book",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": { "value": "", "dynamic": false }
+        },
+        {
+          "controlId": "export-confirm",
+          "trigger": "load",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "export-confirm"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_pageurl}",
+                "name": "address-book",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": { "value": "", "dynamic": false }
+        },
+        {
+          "controlId": "export-confirm--continue",
+          "trigger": "click",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "interaction": { "interactionName": "continue" },
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "export-confirm"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_interactionURL}",
+                "name": "nb:banking:payments:payment-settings:address-book:continue",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": {
+            "value": "nb:banking:payments:payment-settings:address-book:continue",
+            "dynamic": false
+          }
+        },
+        {
+          "controlId": "export-confirm--cancel",
+          "trigger": "click",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "interaction": { "interactionName": "cancel" },
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "export-confirm"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_interactionURL}",
+                "name": "nb:banking:payments:payment-settings:address-book:cancel",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": {
+            "value": "nb:banking:payments:payment-settings:address-book:cancel",
+            "dynamic": false
+          }
+        },
+        {
+          "controlId": "export-success",
+          "trigger": "load",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "export-success"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_pageurl}",
+                "name": "address-book",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": { "value": "", "dynamic": false }
+        },
+        {
+          "controlId": "export-error",
+          "trigger": "load",
+          "xdm": {
+            "eventType": "web.webinteraction.linkClicks",
+            "_commonwealthbankau": {
+              "Identities": { "webTrackerID": "{SC_WEBTRACKER_ID}" },
+              "additionalpageinfo": {
+                "UAI": "{SC_UAI}",
+                "globalMaskingFieldCount": "{SC_globalMaskingFieldCount}",
+                "globalMaskingFieldName": "{SC_globalMaskingFieldName}",
+                "subSectionDetail": "",
+                "subSubSectionDetail": ""
+              },
+              "customer": {
+                "UUIDv4": "{SC_UUIDv4}",
+                "UUIDv5": "{SC_UUIDv5}",
+                "authenticationState": "{SC_authstate}",
+                "customerProfileType": "",
+                "customerSubType": "",
+                "customerType": ""
+              },
+              "error": { "errorMessage": "", "errorType": "" },
+              "form": {},
+              "marketing": {
+                "countingMethod": "select",
+                "enableGa4": "false",
+                "enableFloodLight": "false",
+                "enableConditionalTagging": "false",
+                "enableMultiOperator": "false",
+                "floodLightConfigID": "select",
+                "ga4Obj": "{\"send_to\":\"G-57YPC971CC\"}",
+                "ga4EventName": "page_view",
+                "flObj": "{\"uVariableMappings\":[{\"tag\":\"\",\"uvar\":\"u4\"},{\"tag\":\"\",\"uvar\":\"u8\"},{\"tag\":\"$location.href.split('?')[0]\",\"uvar\":\"u13\"},{\"tag\":\"\",\"uvar\":\"u14\"},{\"tag\":\"address-book\",\"uvar\":\"u19\"},{\"tag\":\"\",\"uvar\":\"u33\"}]}"
+              },
+              "merchant": {},
+              "milestone": {},
+              "onlineApplication": {},
+              "page": {
+                "channel": "{SC_channel}",
+                "page": "address-book",
+                "pageType": "",
+                "pageURL": "{SC_pageurl}",
+                "previousPageName": "{SC_previouspagename}",
+                "section": "banking",
+                "site": "nb",
+                "subSection": "payments",
+                "subSubSection": "payment-settings",
+                "subSubSubsection": "",
+                "bladeName": "export-error"
+              },
+              "personalisation": {},
+              "product": { "featureId": "", "productId": [] },
+              "tools": {},
+              "trackingDetails": {
+                "ECID": "{SC_ecid}",
+                "adobeAnalyticsVersion": "{SC_analyticsversion}",
+                "hourOfDay": "{SC_hourOfDay}",
+                "dayOfWeek": "{SC_dayOfWeek}",
+                "newVSrepeat": "{SC_newVSrepeat}",
+                "internalVSexternal": "{SC_internalVSexternal}"
+              },
+              "webChat": { "webChatEnabled": false }
+            },
+            "commerce": {},
+            "web": {
+              "webInteraction": {
+                "URL": "{SC_pageurl}",
+                "name": "address-book",
+                "type": "other",
+                "linkClicks": { "value": 1 }
+              },
+              "webPageDetails": {
+                "URL": "{SC_pageurl}",
+                "name": "nb:banking:address-book"
+              },
+              "webReferrer": { "URL": "{SC_referrerurl}" }
+            }
+          },
+          "webChat": { "enabled": false, "value": "", "params": "" },
+          "linkName": { "value": "", "dynamic": false }
         }
       ]
     }

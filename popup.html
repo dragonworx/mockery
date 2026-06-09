@@ -65,11 +65,15 @@
             Show notifications when mocks are used
           </label>
         </div>
-        <div class="checkbox-row">
-          <label>
-            <input type="checkbox" id="logToggle" checked>
-            Log mock activity to console
-          </label>
+        <div class="setting-row">
+          <label for="logLevel">Console log level</label>
+          <select id="logLevel">
+            <option value="silent">Silent</option>
+            <option value="error">Error</option>
+            <option value="warn">Warn</option>
+            <option value="info" selected>Info (default)</option>
+            <option value="debug">Debug</option>
+          </select>
         </div>
         <div class="setting-row">
           <label for="toastDuration">Notification duration</label>

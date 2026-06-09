@@ -15,16 +15,19 @@ const rulesList = document.getElementById('rulesList');
 const activityList = document.getElementById('activityList');
 const clearActivityBtn = document.getElementById('clearActivityBtn');
 const notifyToggle = document.getElementById('notifyToggle');
-const logToggle = document.getElementById('logToggle');
+const logLevelSelect = document.getElementById('logLevel');
 const toastDurationInput = document.getElementById('toastDuration');
+
+const LOG_LEVELS = new Set(['silent', 'error', 'warn', 'info', 'debug']);
+const DEFAULT_LOG_LEVEL = 'info';
 
 const DEFAULT_SERVER = 'http://localhost:8756';
 const DEFAULT_TOAST_DURATION = 10;
 
 // ── Init ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  const { enabled, serverUrl, showNotifications, enableLogging, toastDuration } = await chrome.storage.local.get([
-    'enabled', 'serverUrl', 'showNotifications', 'enableLogging', 'toastDuration'
+  const { enabled, serverUrl, showNotifications, enableLogging, logLevel, toastDuration } = await chrome.storage.local.get([
+    'enabled', 'serverUrl', 'showNotifications', 'enableLogging', 'logLevel', 'toastDuration'
   ]);
 
   enableToggle.checked = enabled !== false;
@@ -33,7 +36,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Load settings with defaults
   notifyToggle.checked = showNotifications !== false; // Default to true
-  logToggle.checked = enableLogging !== false;       // Default to true
+
+  // Migrate legacy enableLogging boolean → logLevel
+  let resolvedLevel = LOG_LEVELS.has(logLevel) ? logLevel : null;
+  if (!resolvedLevel) {
+    resolvedLevel = enableLogging === false ? 'silent' : DEFAULT_LOG_LEVEL;
+    await chrome.storage.local.set({ logLevel: resolvedLevel });
+    if (enableLogging !== undefined) await chrome.storage.local.remove('enableLogging');
+  }
+  logLevelSelect.value = resolvedLevel;
   toastDurationInput.value = clampDuration(toastDuration);
 
   enableToggle.addEventListener('change', handleToggle);
@@ -41,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   refreshBtn.addEventListener('click', fetchRules);
   clearActivityBtn.addEventListener('click', handleClearActivity);
   notifyToggle.addEventListener('change', handleNotifyToggle);
-  logToggle.addEventListener('change', handleLogToggle);
+  logLevelSelect.addEventListener('change', handleLogLevelChange);
   toastDurationInput.addEventListener('change', handleToastDurationChange);
   toastDurationInput.addEventListener('blur', handleToastDurationChange);
 
@@ -68,9 +79,10 @@ async function handleNotifyToggle() {
   await chrome.storage.local.set({ showNotifications });
 }
 
-async function handleLogToggle() {
-  const enableLogging = logToggle.checked;
-  await chrome.storage.local.set({ enableLogging });
+async function handleLogLevelChange() {
+  const value = logLevelSelect.value;
+  const logLevel = LOG_LEVELS.has(value) ? value : DEFAULT_LOG_LEVEL;
+  await chrome.storage.local.set({ logLevel });
 }
 
 function clampDuration(value) {

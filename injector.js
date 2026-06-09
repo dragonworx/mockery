@@ -16,7 +16,22 @@
   let enabled = true;
   let rules = [];
   let showNotifications = true;
-  let enableLogging = true;
+
+  // ── Logger ─────────────────────────────────────────────────────────────────────
+  const LOG_LEVELS = { silent: 0, error: 1, warn: 2, info: 3, debug: 4 };
+  const LOG_COLORS = {
+    debug: '#64748b',
+    info: '#8b5cf6',
+    warn: '#f59e0b',
+    error: '#ef4444',
+  };
+  let logLevel = 'info';
+  function shouldLog(level) {
+    return LOG_LEVELS[level] <= (LOG_LEVELS[logLevel] ?? LOG_LEVELS.info);
+  }
+  function prefixStyles(level) {
+    return [`color:${LOG_COLORS[level] || LOG_COLORS.info};font-weight:bold`, 'color:inherit'];
+  }
 
   // ── Wait for initial rules before intercepting ─────────────────────────
   let _rulesReady;
@@ -33,7 +48,7 @@
       rules = msg.rules || [];
       enabled = msg.enabled;
       showNotifications = msg.showNotifications !== false; // Default to true
-      enableLogging = msg.enableLogging !== false;       // Default to true
+      if (msg.logLevel && LOG_LEVELS[msg.logLevel] !== undefined) logLevel = msg.logLevel;
       _rulesReady(); // Signal that rules have arrived
     }
   });
@@ -70,11 +85,11 @@
   let _reqId = 0;
   const _pending = new Map();
 
-  function requestMock(url, method) {
+  function requestMock(url, method, body) {
     return new Promise((resolve) => {
       const id = ++_reqId;
       _pending.set(id, resolve);
-      window.postMessage({ channel: CHANNEL, type: 'RESOLVE_MOCK', id, url, method: method || 'GET' }, '*');
+      window.postMessage({ channel: CHANNEL, type: 'RESOLVE_MOCK', id, url, method: method || 'GET', body: typeof body === 'string' ? body : null }, '*');
 
       // Timeout — fall through to real network after 5 s
       setTimeout(() => {
@@ -90,14 +105,72 @@
     if (event.source !== window) return;
     if (!event.data || event.data.channel !== CHANNEL) return;
     if (event.data.type === 'MOCK_RESPONSE') {
-      const { id, body, mime, error } = event.data;
+      const { id, body, mime, error, handlerLogs } = event.data;
       const resolve = _pending.get(id);
       if (resolve) {
         _pending.delete(id);
-        resolve(error ? null : { body, mime });
+        resolve(error ? null : { body, mime, handlerLogs });
       }
     }
   });
+
+  // ── Handler log replay (MAIN world console) ──────────────────────────
+  function decodeHandlerLogs(encoded) {
+    try {
+      const binary = atob(encoded);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return JSON.parse(new TextDecoder('utf-8').decode(bytes));
+    } catch { return null; }
+  }
+
+  function reviveLogArg(value) {
+    if (value && typeof value === 'object') {
+      if (value.__type === 'Error') {
+        const err = new Error(value.message);
+        err.name = value.name || 'Error';
+        if (value.stack) err.stack = value.stack;
+        return err;
+      }
+      if (value.__type === 'Date') return new Date(value.iso);
+      if (value.__type === 'RegExp') return new RegExp(value.source, value.flags);
+      if (value.__type === 'URLSearchParams') {
+        const p = new URLSearchParams();
+        for (const [k, v] of value.entries || []) p.append(k, v);
+        return p;
+      }
+      if (value.__type === 'Map') {
+        const m = new Map();
+        for (const [k, v] of value.entries || []) m.set(reviveLogArg(k), reviveLogArg(v));
+        return m;
+      }
+      if (value.__type === 'Set') {
+        const s = new Set();
+        for (const v of value.values || []) s.add(reviveLogArg(v));
+        return s;
+      }
+      if (Array.isArray(value)) return value.map(reviveLogArg);
+      const out = {};
+      for (const k of Object.keys(value)) out[k] = reviveLogArg(value[k]);
+      return out;
+    }
+    return value;
+  }
+
+  function replayHandlerLogs(encoded, url) {
+    if (!encoded) return;
+    const decoded = decodeHandlerLogs(encoded);
+    if (!decoded || !Array.isArray(decoded.logs) || decoded.logs.length === 0) return;
+    const label = `%c[Mockery handler]%c ${decoded.handler || 'handler'} %c${url}`;
+    const styles = ['color:#8b5cf6;font-weight:bold', 'color:inherit', 'color:#06b6d4'];
+    try { console.groupCollapsed(label, ...styles); } catch { /* ignore */ }
+    for (const entry of decoded.logs) {
+      const fn = (console[entry.level] || console.log).bind(console);
+      try { fn(...(entry.args || []).map(reviveLogArg)); }
+      catch { try { fn('[Mockery] failed to replay log', entry); } catch { /* swallow */ } }
+    }
+    try { console.groupEnd(); } catch { /* ignore */ }
+  }
 
   // ── Patch fetch() ────────────────────────────────────────────────────
   const originalFetch = window.fetch;
@@ -115,19 +188,45 @@
     const rule = findMatch(url, method);
 
     if (rule) {
-      if (enableLogging) {
-        console.log(`%c[Mockery]%c ${method} %c${url}%c — %crule matched%c, requesting mock…`, 'color:#8b5cf6;font-weight:bold', 'color:inherit;font-weight:bold', 'color:#06b6d4', 'color:inherit', 'color:#10b981;font-weight:bold', 'color:inherit');
+      if (shouldLog('info')) {
+        const [pBold, pReset] = prefixStyles('info');
+        console.log(`%c[Mockery]%c ${method} %c${url}%c — %crule matched%c, requesting mock…`, pBold, pReset, 'color:#06b6d4', 'color:inherit', 'color:#10b981;font-weight:bold', 'color:inherit');
       }
-      const mock = await requestMock(url, method);
+      // Extract body as string when possible (most APIs send JSON strings or Blobs)
+      let bodyForServer = null;
+      try {
+        if (input instanceof Request) {
+          bodyForServer = await input.clone().text();
+        } else if (init?.body != null) {
+          const b = init.body;
+          if (typeof b === 'string') {
+            bodyForServer = b;
+          } else if (b instanceof Blob) {
+            bodyForServer = await b.text();
+          } else if (b instanceof ArrayBuffer) {
+            bodyForServer = new TextDecoder().decode(b);
+          } else if (ArrayBuffer.isView(b)) {
+            bodyForServer = new TextDecoder().decode(b.buffer);
+          } else if (b instanceof URLSearchParams) {
+            bodyForServer = b.toString();
+          }
+        }
+      } catch { /* ignore body extraction errors */ }
+
+      const mock = await requestMock(url, method, bodyForServer);
 
       if (mock) {
-        if (enableLogging) {
+        // Replay any console output the server-side handler produced
+        replayHandlerLogs(mock.handlerLogs, url);
+
+        if (shouldLog('info')) {
           let parsedMock;
           try { parsedMock = JSON.parse(mock.body); } catch { parsedMock = mock.body; }
 
+          const [pBold, pReset] = prefixStyles('info');
           console.groupCollapsed(
             `%c[Mockery]%c ${method} %c${url}%c → %c${rule.file || 'handler'}`,
-            'color:#8b5cf6;font-weight:bold', 'color:inherit;font-weight:bold',
+            pBold, pReset,
             'color:#06b6d4', 'color:inherit',
             'color:#10b981;font-weight:bold'
           );
@@ -160,8 +259,9 @@
           statusText: 'OK (mocked)',
           headers: { 'Content-Type': mock.mime },
         });
-      } else if (enableLogging) {
-        console.warn(`%c[Mockery]%c ${method} %c${url}%c — mock was null, falling through to network`, 'color:#8b5cf6;font-weight:bold', 'color:inherit;font-weight:bold', 'color:#06b6d4', 'color:#f59e0b');
+      } else if (shouldLog('warn')) {
+        const [pBold, pReset] = prefixStyles('warn');
+        console.warn(`%c[Mockery]%c ${method} %c${url}%c — mock was null, falling through to network`, pBold, pReset, 'color:#06b6d4', 'color:inherit');
       }
     }
 
@@ -195,19 +295,24 @@
       }
 
       const xhrMethod = xhr.__mockMethod || 'GET';
-      requestMock(url, xhrMethod).then((mock) => {
+      const xhrBody = typeof body === 'string' ? body : null;
+      requestMock(url, xhrMethod, xhrBody).then((mock) => {
       if (!mock) {
         // Fallback to real network
         origSend.call(xhr, body);
         return;
       }
 
+      // Replay any console output the server-side handler produced
+      replayHandlerLogs(mock.handlerLogs, url);
+
       let parsedMock;
       try { parsedMock = JSON.parse(mock.body); } catch { parsedMock = mock.body; }
-      if (enableLogging) {
+      if (shouldLog('info')) {
+        const [pBold, pReset] = prefixStyles('info');
         console.groupCollapsed(
           `%c[Mockery]%c ${xhrMethod} %c${url}%c → %c${rule.file || 'handler'}`,
-          'color:#8b5cf6;font-weight:bold', 'color:inherit;font-weight:bold',
+          pBold, pReset,
           'color:#06b6d4', 'color:inherit',
           'color:#10b981;font-weight:bold'
         );
@@ -282,5 +387,8 @@
     });
   };
 
-  console.log('%c[Mockery]%c Injector ready', 'color:#8b5cf6;font-weight:bold', 'color:inherit');
+  if (shouldLog('debug')) {
+    const [pBold, pReset] = prefixStyles('debug');
+    console.debug('%c[Mockery]%c Injector ready', pBold, pReset);
+  }
 })();

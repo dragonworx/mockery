@@ -4,11 +4,11 @@
  * Powered by Bun.
  *
  * Usage:
- *   bun run server/index.ts                    # reads mocks/config.ts from cwd
+ *   bun run server/index.ts                    # reads mocks/.config.ts from cwd
  *   bun run server/index.ts 9000               # custom port
  *   bun run server/index.ts --config ./my-mocks.ts   # custom config path
  *
- * Config format (mocks/config.ts):
+ * Config format (mocks/.config.ts):
  *   export default [
  *     { pattern: "https://api.example.com/users", file: "users.json" },
  *     { pattern: "https://api.example.com/dynamic", handler: async (req) => ({ status: 200, body: "Hi" }) },
@@ -30,6 +30,7 @@
 
 import { watch, existsSync, readFileSync, writeFileSync, statSync } from 'fs';
 import { join, resolve, extname, dirname, isAbsolute } from 'path';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,7 +91,7 @@ if (existsSync(handlersPath)) {
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 let port = 8756;
-let configPath = join(process.cwd(), 'mocks', 'config.ts');
+let configPath = join(process.cwd(), 'mocks', '.config.ts');
 
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
@@ -221,22 +222,110 @@ async function loadHandler(handlerOrPath: HandlerFunction | string): Promise<Han
   }
 }
 
-function buildRequestObject(req: Request, url: string, targetMethod: string): HandlerRequest {
+function buildRequestObject(req: Request, url: string, targetMethod: string, body: string | null): HandlerRequest {
   return {
     url,
     method: targetMethod || 'GET',
     headers: Object.fromEntries(req.headers.entries()),
-    body: null,
+    body,
     query: new URL(url).searchParams,
     timestamp: new Date().toISOString()
   };
+}
+
+// ── Handler logger ─────────────────────────────────────────────────────────
+// Handlers `import { log } from '../server/index.ts'` and call log.info/...
+// Each call:
+//   1. prints to the server terminal (so devs see it locally)
+//   2. is captured into the current request's buffer so it can be replayed
+//      in the browser console via the X-Mockery-Logs response header.
+type CapturedLog = { level: 'log' | 'info' | 'warn' | 'error' | 'debug'; args: unknown[] };
+
+interface HandlerContext {
+  logs: CapturedLog[];
+  handlerName: string;
+}
+
+const handlerContext = new AsyncLocalStorage<HandlerContext>();
+
+// Safely stringify each argument so it survives JSON transport.
+function safeSerialize(value: unknown, seen = new WeakSet()): unknown {
+  if (value === null || value === undefined) return value;
+  const t = typeof value;
+  if (t === 'string' || t === 'number' || t === 'boolean') return value;
+  if (t === 'bigint') return `${(value as bigint).toString()}n`;
+  if (t === 'function') return `[Function ${(value as Function).name || 'anonymous'}]`;
+  if (t === 'symbol') return (value as symbol).toString();
+  if (value instanceof Error) {
+    return { __type: 'Error', name: value.name, message: value.message, stack: value.stack };
+  }
+  if (value instanceof Date) return { __type: 'Date', iso: value.toISOString() };
+  if (value instanceof RegExp) return { __type: 'RegExp', source: value.source, flags: value.flags };
+  if (value instanceof URLSearchParams) return { __type: 'URLSearchParams', entries: [...value.entries()] };
+  if (value instanceof Map) return { __type: 'Map', entries: [...value.entries()].map(([k, v]) => [safeSerialize(k, seen), safeSerialize(v, seen)]) };
+  if (value instanceof Set) return { __type: 'Set', values: [...value].map(v => safeSerialize(v, seen)) };
+  if (typeof (value as any)?.toJSON === 'function') {
+    try { return safeSerialize((value as any).toJSON(), seen); } catch { /* fall through */ }
+  }
+  if (t === 'object') {
+    if (seen.has(value as object)) return '[Circular]';
+    seen.add(value as object);
+    if (Array.isArray(value)) return value.map(v => safeSerialize(v, seen));
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as object)) {
+      try { out[k] = safeSerialize(v, seen); } catch { out[k] = '[Unserializable]'; }
+    }
+    return out;
+  }
+  return String(value);
+}
+
+function emit(level: CapturedLog['level'], args: unknown[]) {
+  // 1. Always print to the server terminal so dev sees it locally.
+  const consoleFn = (console[level] || console.log) as (...a: unknown[]) => void;
+  const ctx = handlerContext.getStore();
+  if (ctx) {
+    consoleFn.call(console, `[mockery:${ctx.handlerName}]`, ...args);
+    // 2. Capture for transport to the browser
+    try {
+      ctx.logs.push({ level, args: args.map(a => safeSerialize(a)) });
+    } catch {
+      ctx.logs.push({ level, args: ['[Mockery] failed to serialize log args'] });
+    }
+  } else {
+    // Called outside a handler request — just print locally.
+    consoleFn.call(console, ...args);
+  }
+}
+
+/**
+ * Logger for handlers. Mirrors the console API surface (log/info/warn/error/debug).
+ * Logs are printed to the server terminal AND forwarded to the browser console.
+ *
+ * Usage in a handler:
+ *   import { log } from '../server/index.ts';
+ *   log.info('something happened', { detail: 42 });
+ */
+export const log = {
+  log: (...args: unknown[]) => emit('log', args),
+  info: (...args: unknown[]) => emit('info', args),
+  warn: (...args: unknown[]) => emit('warn', args),
+  error: (...args: unknown[]) => emit('error', args),
+  debug: (...args: unknown[]) => emit('debug', args),
+};
+
+async function withHandlerContext<T>(handlerName: string, fn: () => Promise<T>): Promise<{ result: T; logs: CapturedLog[] }> {
+  const ctx: HandlerContext = { logs: [], handlerName };
+  const result = await handlerContext.run(ctx, fn);
+  return { result, logs: ctx.logs };
 }
 
 async function resolveWithHandler(
   targetUrl: string,
   rule: MockRule,
   req: Request,
-  targetMethod: string
+  targetMethod: string,
+  body: string | null = null
 ): Promise<HandlerResponse | null> {
   let originalResponse: HandlerResponse | null = null;
 
@@ -266,25 +355,39 @@ async function resolveWithHandler(
   if (rule.handler) {
     const handler = await loadHandler(rule.handler);
     if (handler) {
+      const handlerName = typeof rule.handler === 'function' ? 'inline function' : rule.handler;
       try {
-        const requestObj = buildRequestObject(req, targetUrl, targetMethod);
-        const result = await handler(requestObj, originalResponse);
+        const requestObj = buildRequestObject(req, targetUrl, targetMethod, body);
+        const { result, logs } = await withHandlerContext(handlerName, () => handler(requestObj, originalResponse));
 
         // Validate handler response
         if (!result || typeof result !== 'object') {
           throw new Error('Handler must return a response object');
         }
 
-        const handlerName = typeof rule.handler === 'function' ? 'inline function' : rule.handler;
         console.log(`[mockery] ${targetMethod || req.method} ${targetUrl} → ${handlerName} (handler)`);
-        return result;
+
+        // Attach captured logs as a custom header so the browser can replay them.
+        const merged: HandlerResponse = {
+          ...result,
+          headers: {
+            ...(result.headers || {}),
+            ...(logs.length ? { 'X-Mockery-Logs': encodeMockeryLogs(logs, handlerName) } : {}),
+          },
+        };
+        return merged;
       } catch (err: any) {
-        const handlerName = typeof rule.handler === 'function' ? 'inline function' : rule.handler;
-        console.error(`[mockery] Handler execution error for ${handlerName}:`, err.message);
+        console.error(`[mockery] Handler execution error for ${handlerName}:`, err.stack || err.message);
         return {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: 'Handler execution error', handler: handlerName, detail: err.message })
+          body: JSON.stringify({
+            error: 'Handler execution error',
+            handler: handlerName,
+            detail: err.message,
+            name: err.name,
+            stack: err.stack,
+          })
         };
       }
     } else {
@@ -298,6 +401,18 @@ async function resolveWithHandler(
   }
 
   return originalResponse;
+}
+
+// Encode captured logs for transport over an HTTP header.
+// Headers are ASCII-only and can't contain newlines, so we JSON-stringify then base64-encode.
+function encodeMockeryLogs(logs: CapturedLog[], handlerName: string): string {
+  try {
+    const json = JSON.stringify({ handler: handlerName, logs });
+    // btoa-equivalent for arbitrary unicode strings
+    return Buffer.from(json, 'utf8').toString('base64');
+  } catch {
+    return '';
+  }
 }
 
 function resolveFilePath(file: string): string {
@@ -433,6 +548,7 @@ const server = Bun.serve({
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': '*',
+      'Access-Control-Expose-Headers': 'X-Mockery-Logs, Content-Type',
     };
 
     if (req.method === 'OPTIONS') {
@@ -457,7 +573,15 @@ const server = Bun.serve({
       }
 
       try {
-        const result = await resolveWithHandler(targetUrl, rule, req, targetMethod);
+        // Read forwarded body if present (POST from background.js when page sent a body)
+        let forwardedBody: string | null = null;
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          try { forwardedBody = await req.text(); }
+          catch { forwardedBody = null; }
+          if (forwardedBody === '') forwardedBody = null;
+        }
+
+        const result = await resolveWithHandler(targetUrl, rule, req, targetMethod, forwardedBody);
 
         if (!result) {
           return Response.json(
@@ -474,7 +598,7 @@ const server = Bun.serve({
       } catch (error: any) {
         console.error(`[mockery] Request processing error:`, error);
         return Response.json(
-          { error: 'Internal server error', detail: error.message },
+          { error: 'Internal server error', name: error.name, detail: error.message, stack: error.stack },
           { status: 500, headers: corsHeaders }
         );
       }
@@ -513,7 +637,7 @@ const server = Bun.serve({
       } catch (error: any) {
         console.error(`[mockery] Request processing error:`, error);
         return Response.json(
-          { error: 'Internal server error', detail: error.message },
+          { error: 'Internal server error', name: error.name, detail: error.message, stack: error.stack },
           { status: 500, headers: corsHeaders }
         );
       }
@@ -611,7 +735,7 @@ console.log(`[mockery] Config: ${configPath}`);
 console.log(`[mockery] Endpoints:`);
 console.log(`  GET /resolve?url=<encoded>       — serve a matched mock`);
 console.log(`  GET /resolve-pattern?pattern=<>  — serve mock by pattern (for declarativeNetRequest)`);
-console.log(`  GET /rules                       — list current rules from mocks/config.ts`);
+console.log(`  GET /rules                       — list current rules from mocks/.config.ts`);
 console.log(`  GET /events                      — SSE stream for hot reload`);
 console.log(`  GET /health                      — server status`);
 

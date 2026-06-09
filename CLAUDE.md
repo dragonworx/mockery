@@ -61,7 +61,7 @@ pkill -f 'bun.*server/index.ts'
 4. Reload test pages to see changes
 
 **Refreshing Rules:**
-- Edit `mocks/config.ts` or add/modify files in `mocks/` folder
+- Edit `mocks/.config.ts` or add/modify files in `mocks/` folder
 - Click "Refresh Rules" in the extension popup to update both JavaScript and declarativeNetRequest rules
 - Or restart the server to automatically refresh rules on next page load
 
@@ -82,7 +82,7 @@ The extension uses a **hybrid architecture** that intercepts different types of 
 
 2. **HTML Resource Requests** (img tags, CSS, script tags)
    - **declarativeNetRequest API** - intercepts at network layer
-   - **Dynamic Rule Generation** - converts mocks/config.ts to Chrome rules
+   - **Dynamic Rule Generation** - converts mocks/.config.ts to Chrome rules
    - **Redirect to Server** - routes to same Bun companion server
 
 ### Message Flow Examples
@@ -124,12 +124,12 @@ Rules are managed through direct file system manipulation:
 
 1. **Create mock files** in the `mocks/` folder (or subfolders)
 2. **Create handler functions** in the `mocks/handlers/` folder (optional)
-3. **Edit `mocks/config.ts`** to add URL patterns, file paths, and handlers (inline or imported)
-4. **Server hot-reloads** configuration when `mocks/config.ts` or handler files change
+3. **Edit `mocks/.config.ts`** to add URL patterns, file paths, and handlers (inline or imported)
+4. **Server hot-reloads** configuration when `mocks/.config.ts` or handler files change
 
 ### Configuration File
 
-`mocks/config.ts` format (TypeScript module with ESM exports):
+`mocks/.config.ts` format (TypeScript module with ESM exports):
 ```typescript
 import type { MockRule } from '../server/index.ts';
 
@@ -170,7 +170,7 @@ export default [
 
 Handler functions allow dynamic response generation and modification with three approaches:
 
-- **Inline Functions**: Define handlers directly in `config.ts`
+- **Inline Functions**: Define handlers directly in `.config.ts`
 - **Imported Modules**: Import handlers using `import` (ESM)
 - **File Path Strings**: Reference handler files by path (resolved at runtime)
 - **Function signature**: `async (request, originalResponse) => responseObject`
@@ -227,7 +227,7 @@ export default handler;
 Relative paths in rules are resolved as follows:
 - Simple filenames (e.g. `"users.json"`) automatically resolve to `mocks/users.json`
 - Paths with directories (e.g. `"api/users.json"`) resolve to `mocks/api/users.json`
-- Paths starting with `./` or `../` are resolved relative to `mocks/config.ts` location
+- Paths starting with `./` or `../` are resolved relative to `mocks/.config.ts` location
 - Absolute paths are used as-is
 
 ### Folder Organization
@@ -235,7 +235,7 @@ Relative paths in rules are resolved as follows:
 The `mocks/` folder can be organized however you prefer:
 ```
 mocks/
-├── config.ts           # Main configuration file (TypeScript module)
+├── .config.ts           # Main configuration file (TypeScript module)
 ├── api/
 │   ├── users.json
 │   └── auth/
@@ -320,7 +320,7 @@ The extension properly handles binary files (images, PDFs, fonts, archives) by:
 ## Server API Endpoints
 
 - `GET /health` — Server status and rule count
-- `GET /rules` — List all rules from mocks/config.ts
+- `GET /rules` — List all rules from mocks/.config.ts
 - `GET /resolve?url=<encoded>&method=<method>` — Resolve mock for URL (used by extension)
 - `GET /resolve-pattern?pattern=<encoded>` — Resolve mock by pattern (used by declarativeNetRequest)
 - `GET /events` — SSE stream for hot reload notifications
@@ -399,7 +399,7 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 ├── server/
 │   └── index.ts           # Bun companion server (TypeScript, zero dependencies!)
 └── mocks/                 # Mock response files (organize as needed)
-    ├── config.ts          # Server configuration (TypeScript module)
+    ├── .config.ts          # Server configuration (TypeScript module)
     └── handlers/          # TypeScript handler functions
 ```
 

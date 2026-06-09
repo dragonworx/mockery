@@ -13,6 +13,29 @@ const CHANNEL = '__MOCKERY__';
 const DEFAULT_TOAST_DURATION_MS = 10000;
 let toastDurationMs = DEFAULT_TOAST_DURATION_MS;
 
+// ── Logger ───────────────────────────────────────────────────────────────────────────────
+const LOG_LEVELS = { silent: 0, error: 1, warn: 2, info: 3, debug: 4 };
+const LOG_COLORS = {
+  debug: '#64748b',
+  info: '#8b5cf6',
+  warn: '#f59e0b',
+  error: '#ef4444',
+};
+let currentLogLevel = 'info';
+function shouldLog(level) {
+  return LOG_LEVELS[level] <= (LOG_LEVELS[currentLogLevel] ?? LOG_LEVELS.info);
+}
+function logPrefix(level) {
+  const c = LOG_COLORS[level] || LOG_COLORS.info;
+  return [`%c[Mockery]%c`, `color:${c};font-weight:bold`, 'color:inherit'];
+}
+const LOG_METHOD_BY_LEVEL = { debug: 'debug', info: 'log', warn: 'warn', error: 'error' };
+function log(level, ...args) {
+  if (!shouldLog(level)) return;
+  const method = LOG_METHOD_BY_LEVEL[level] || 'log';
+  console[method](...logPrefix(level), ...args);
+}
+
 function applyToastDuration(value) {
   const n = Number.parseInt(value, 10);
   if (Number.isFinite(n) && n >= 1 && n <= 60) {
@@ -27,9 +50,15 @@ chrome.storage.local.get('toastDuration').then(({ toastDuration }) => applyToast
 // ── Push rules into MAIN world ──────────────────────────────────────────────
 
 async function pushRules() {
-  const { enabled, serverUrl, showNotifications, enableLogging } = await chrome.storage.local.get([
-    'enabled', 'serverUrl', 'showNotifications', 'enableLogging'
+  const { enabled, serverUrl, showNotifications, logLevel, enableLogging } = await chrome.storage.local.get([
+    'enabled', 'serverUrl', 'showNotifications', 'logLevel', 'enableLogging'
   ]);
+  // Resolve log level (migrate legacy enableLogging boolean if present)
+  let resolvedLevel;
+  if (LOG_LEVELS[logLevel] !== undefined) resolvedLevel = logLevel;
+  else if (enableLogging === false) resolvedLevel = 'silent';
+  else resolvedLevel = 'info';
+  currentLogLevel = resolvedLevel;
   const base = serverUrl || 'http://localhost:8756';
   let rules = [];
 
@@ -48,14 +77,14 @@ async function pushRules() {
     rules,
     enabled: enabled !== false,
     showNotifications: showNotifications !== false, // Default to true
-    enableLogging: enableLogging !== false,       // Default to true
+    logLevel: resolvedLevel,
   }, '*');
 }
 
 // Initial push + refresh on storage changes
 pushRules();
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && (changes.enabled || changes.serverUrl || changes.showNotifications || changes.enableLogging)) {
+  if (area === 'local' && (changes.enabled || changes.serverUrl || changes.showNotifications || changes.logLevel || changes.enableLogging)) {
     pushRules();
   }
   if (area === 'local' && changes.toastDuration) {
@@ -74,7 +103,7 @@ window.addEventListener('message', (event) => {
 // Re-push when background notifies of config change (SSE hot reload)
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'RULES_CHANGED') {
-    console.log('[Mockery] Hot reload: rules updated');
+    log('debug', 'Hot reload: rules updated');
     pushRules();
   }
 });
@@ -86,7 +115,7 @@ window.addEventListener('message', async (event) => {
   if (!event.data || event.data.channel !== CHANNEL) return;
   if (event.data.type !== 'RESOLVE_MOCK') return;
 
-  const { id, url, method } = event.data;
+  const { id, url, method, body } = event.data;
 
   try {
     // Ask the background SW (which can fetch localhost without mixed-content issues)
@@ -94,6 +123,7 @@ window.addEventListener('message', async (event) => {
       type: 'RESOLVE_MOCK',
       url,
       method: method || 'GET',
+      body: typeof body === 'string' ? body : null,
     });
 
     if (result && !result.error) {
@@ -103,7 +133,11 @@ window.addEventListener('message', async (event) => {
         id,
         body: result.body,
         mime: result.mime,
+        handlerLogs: result.handlerLogs || null,
       }, '*');
+
+      // Replay handler logs in the ISOLATED-world console too (visible in page DevTools)
+      replayHandlerLogs(result.handlerLogs, url);
 
       showToast(url, result.file, 'success');
     } else {
@@ -115,8 +149,8 @@ window.addEventListener('message', async (event) => {
       }, '*');
 
       // Show error toast with details
-      const errorMessage = result?.detail ? parseErrorDetail(result.detail) : result?.error || 'Unknown error';
-      showToast(url, null, 'error', errorMessage);
+      const errorInfo = buildErrorInfo(result);
+      showToast(url, null, 'error', errorInfo);
     }
   } catch (err) {
     window.postMessage({
@@ -126,12 +160,131 @@ window.addEventListener('message', async (event) => {
       error: true,
     }, '*');
 
-    showToast(url, null, 'error', 'Server connection failed');
+    showToast(url, null, 'error', {
+      summary: 'Server connection failed',
+      detail: err?.message || String(err),
+      stack: err?.stack || null,
+    });
   }
 });
 
-// ── Toast notifications ─────────────────────────────────────────────────────
+// ── Handler-log replay ──────────────────────────────────────────────────────
 
+// Decode the X-Mockery-Logs base64-JSON header forwarded by background.js and
+// replay each captured log call into THIS world's console (page DevTools).
+function replayHandlerLogs(encoded, url) {
+  if (!encoded) return;
+  const decoded = decodeHandlerLogs(encoded);
+  if (!decoded) return;
+  const { handler, logs } = decoded;
+  if (!Array.isArray(logs) || logs.length === 0) return;
+
+  const groupLabel = `%c[Mockery handler]%c ${handler || 'handler'} %c${url}`;
+  const groupStyles = ['color:#8b5cf6;font-weight:bold', 'color:inherit', 'color:#06b6d4'];
+  try { console.groupCollapsed(groupLabel, ...groupStyles); } catch { /* ignore */ }
+  for (const entry of logs) {
+    const fn = (console[entry.level] || console.log).bind(console);
+    try {
+      fn(...(entry.args || []).map(reviveLogArg));
+    } catch {
+      try { fn('[Mockery] failed to replay log', entry); } catch { /* swallow */ }
+    }
+  }
+  try { console.groupEnd(); } catch { /* ignore */ }
+}
+
+function decodeHandlerLogs(encoded) {
+  try {
+    const binary = atob(encoded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const json = new TextDecoder('utf-8').decode(bytes);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+// Inverse of server-side safeSerialize: turn sentinel-tagged objects back into
+// browser equivalents so console.log renders nicely.
+function reviveLogArg(value) {
+  if (value && typeof value === 'object') {
+    if (value.__type === 'Error') {
+      const err = new Error(value.message);
+      err.name = value.name || 'Error';
+      if (value.stack) err.stack = value.stack;
+      return err;
+    }
+    if (value.__type === 'Date') return new Date(value.iso);
+    if (value.__type === 'RegExp') return new RegExp(value.source, value.flags);
+    if (value.__type === 'URLSearchParams') {
+      const p = new URLSearchParams();
+      for (const [k, v] of value.entries || []) p.append(k, v);
+      return p;
+    }
+    if (value.__type === 'Map') {
+      const m = new Map();
+      for (const [k, v] of value.entries || []) m.set(reviveLogArg(k), reviveLogArg(v));
+      return m;
+    }
+    if (value.__type === 'Set') {
+      const s = new Set();
+      for (const v of value.values || []) s.add(reviveLogArg(v));
+      return s;
+    }
+    if (Array.isArray(value)) return value.map(reviveLogArg);
+    const out = {};
+    for (const k of Object.keys(value)) out[k] = reviveLogArg(value[k]);
+    return out;
+  }
+  return value;
+}
+
+// ── Toast notifications ─────────────────────────────────────────────────────
+// Build a structured error info object from whatever the background SW returned.
+// Result shape: { summary, name, handler, detail, stack, status, raw }
+function buildErrorInfo(result) {
+  const info = {
+    summary: result?.error || 'Unknown error',
+    name: null,
+    handler: null,
+    detail: null,
+    stack: null,
+    status: null,
+    raw: null,
+  };
+
+  // result.error often looks like "Server returned 500"
+  const statusMatch = /Server returned (\d+)/.exec(info.summary);
+  if (statusMatch) info.status = Number(statusMatch[1]);
+
+  // result.detail is the raw response body from the server (usually JSON)
+  if (typeof result?.detail === 'string') {
+    info.raw = result.detail;
+    try {
+      const parsed = JSON.parse(result.detail);
+      info.summary = parsed.error || info.summary;
+      info.name = parsed.name || null;
+      info.handler = parsed.handler || null;
+      info.detail = parsed.detail || null;
+      info.stack = parsed.stack || null;
+
+      // Nice friendly rewrites for common cases
+      if (parsed.error === 'File read error' && parsed.file) {
+        info.summary = `File not found: ${parsed.file}`;
+      } else if (parsed.error === 'No matching rule') {
+        info.summary = 'No rule matches this URL';
+      }
+    } catch {
+      // Not JSON — use raw text as detail
+      info.detail = result.detail;
+    }
+  }
+
+  return info;
+}
+
+// Kept for backward compatibility; unused in the new error toast path.
 function parseErrorDetail(detail) {
   try {
     const error = JSON.parse(detail);
@@ -247,7 +400,7 @@ function splitUrl(url) {
   }
 }
 
-function showToast(url, file, type = 'success', customMessage = null) {
+function showToast(url, file, type = 'success', errorInfoOrMessage = null) {
   const list = ensureToastContainer();
   const isError = type === 'error';
   const toast = document.createElement('div');
@@ -261,6 +414,9 @@ function showToast(url, file, type = 'success', customMessage = null) {
   const label          = isError ? 'MOCK ERROR' : 'MOCKED';
   const icon           = isError ? '❌' : '🔄';
 
+  // Error toasts get extra width to fit stack traces
+  const maxWidth = isError ? 'min(880px, calc(100vw - 40px))' : 'min(720px, calc(100vw - 40px))';
+
   toast.style.cssText = `
     position: relative;
     background: ${backgroundColor}; color: ${textColor};
@@ -271,12 +427,11 @@ function showToast(url, file, type = 'success', customMessage = null) {
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     font-size: 13px; line-height: 1.4;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    max-width: min(720px, calc(100vw - 40px));
+    max-width: ${maxWidth};
     width: max-content;
     pointer-events: auto;
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
+    cursor: ${isError ? 'default' : 'pointer'};
+    ${isError ? '' : 'user-select: none; -webkit-user-select: none;'}
     opacity: 0; transform: translateX(100%);
     transition: all 0.3s ease-out;
   `;
@@ -284,31 +439,68 @@ function showToast(url, file, type = 'success', customMessage = null) {
   const { origin, path } = splitUrl(url);
 
   if (isError) {
+    // Normalize: support legacy string customMessage as well as structured info
+    const info = (errorInfoOrMessage && typeof errorInfoOrMessage === 'object')
+      ? errorInfoOrMessage
+      : { summary: errorInfoOrMessage || 'Unknown error' };
+
+    const lines = [];
+    if (info.handler) lines.push(['handler', info.handler]);
+    if (info.name && info.name !== 'Error') lines.push(['type', info.name]);
+    if (info.status) lines.push(['status', String(info.status)]);
+    if (info.detail && info.detail !== info.summary) lines.push(['message', info.detail]);
+
+    const metaHtml = lines.length
+      ? `<div style="margin-top:6px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.5;">
+          ${lines.map(([k, v]) => `<div><span style="color:${mutedColor};">${escapeHtml(k)}:</span> <span style="color:${textColor};">${escapeHtml(v)}</span></div>`).join('')}
+        </div>`
+      : '';
+
+    const stackHtml = info.stack
+      ? `<details style="margin-top:8px;">
+          <summary style="cursor:pointer;font-size:11px;font-weight:600;color:${accentColor};user-select:none;-webkit-user-select:none;">Stack trace</summary>
+          <pre style="margin:6px 0 0 0;padding:8px;background:rgba(0,0,0,0.06);border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.45;color:${textColor};white-space:pre-wrap;word-break:break-word;max-height:240px;overflow:auto;">${escapeHtml(info.stack)}</pre>
+        </details>`
+      : '';
+
+    const closeBtn = `<button type="button" data-mockery-close style="position:absolute;top:6px;right:8px;background:transparent;border:none;color:${mutedColor};font-size:16px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:3px;" title="Dismiss">×</button>`;
+
     toast.innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+      ${closeBtn}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;padding-right:18px;">
         <span style="font-size:14px;">${icon}</span>
         <span style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:${accentColor};">${label}</span>
-        <span style="font-size:12px;color:${mutedColor};">${escapeHtml(customMessage || '')}</span>
+        <span style="font-size:12px;color:${textColor};font-weight:600;">${escapeHtml(info.summary || 'Unknown error')}</span>
       </div>
       <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;">
         <span style="color:${mutedColor};">${escapeHtml(origin)}</span><span style="font-weight:600;color:${textColor};">${escapeHtml(path)}</span>
       </div>
+      ${metaHtml}
+      ${stackHtml}
     `;
   } else {
     toast.innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;margin-bottom:4px;">
+        <span style="color:${mutedColor};">${escapeHtml(origin)}</span><span style="font-weight:600;color:${textColor};">${escapeHtml(path)}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
         <span style="font-size:14px;">${icon}</span>
         <span style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:${accentColor};">${label}</span>
         <span style="font-size:12px;color:${mutedColor};">→ ${escapeHtml(file || 'stub')}</span>
       </div>
-      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;">
-        <span style="color:${mutedColor};">${escapeHtml(origin)}</span><span style="font-weight:600;color:${textColor};">${escapeHtml(path)}</span>
-      </div>
     `;
   }
 
-  toast.title = 'Click to dismiss';
-  toast.addEventListener('click', () => dismissToast(toast));
+  if (isError) {
+    // Only the explicit close button dismisses an error toast — keep auto-timer too,
+    // but allow text selection / details expansion inside.
+    const closeEl = toast.querySelector('[data-mockery-close]');
+    if (closeEl) closeEl.addEventListener('click', (e) => { e.stopPropagation(); dismissToast(toast); });
+    toast.title = 'Click × to dismiss';
+  } else {
+    toast.title = 'Click to dismiss';
+    toast.addEventListener('click', () => dismissToast(toast));
+  }
 
   list.appendChild(toast);
   updateDismissAllVisibility();
@@ -318,7 +510,9 @@ function showToast(url, file, type = 'success', customMessage = null) {
     toast.style.transform = 'translateX(0)';
   });
 
-  toast.__timer = setTimeout(() => dismissToast(toast), toastDurationMs);
+  // Error toasts persist longer so the user has time to read the stack
+  const duration = isError ? Math.max(toastDurationMs, 30_000) : toastDurationMs;
+  toast.__timer = setTimeout(() => dismissToast(toast), duration);
 }
 
-console.log('[Mockery] ISOLATED bridge loaded');
+log('debug', 'ISOLATED bridge loaded');

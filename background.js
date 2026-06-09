@@ -7,11 +7,44 @@
 
 const DEFAULT_SERVER = 'http://localhost:8756';
 
+// ── Logger ──────────────────────────────────────────────────────────────────────
+const LOG_LEVELS = { silent: 0, error: 1, warn: 2, info: 3, debug: 4 };
+const LOG_COLORS = {
+  debug: '#64748b',
+  info: '#8b5cf6',
+  warn: '#f59e0b',
+  error: '#ef4444',
+};
+let currentLogLevel = 'info';
+function shouldLog(level) {
+  return LOG_LEVELS[level] <= (LOG_LEVELS[currentLogLevel] ?? LOG_LEVELS.info);
+}
+function logPrefix(level) {
+  const c = LOG_COLORS[level] || LOG_COLORS.info;
+  return [`%c[Mockery]%c`, `color:${c};font-weight:bold`, 'color:inherit'];
+}
+const LOG_METHOD_BY_LEVEL = { debug: 'debug', info: 'log', warn: 'warn', error: 'error' };
+function log(level, ...args) {
+  if (!shouldLog(level)) return;
+  const method = LOG_METHOD_BY_LEVEL[level] || 'log';
+  console[method](...logPrefix(level), ...args);
+}
+async function refreshLogLevel() {
+  const { logLevel, enableLogging } = await chrome.storage.local.get(['logLevel', 'enableLogging']);
+  if (LOG_LEVELS[logLevel] !== undefined) currentLogLevel = logLevel;
+  else if (enableLogging === false) currentLogLevel = 'silent';
+  else currentLogLevel = 'info';
+}
+refreshLogLevel();
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && (changes.logLevel || changes.enableLogging)) refreshLogLevel();
+});
+
 /**
  * Initialize extension on install
  */
 chrome.runtime.onInstalled.addListener(async () => {
-  console.log('[Mockery] Extension installed');
+  log('debug', 'Extension installed');
   const storage = await chrome.storage.local.get(['enabled', 'serverUrl']);
   if (storage.enabled === undefined) {
     await chrome.storage.local.set({ enabled: true });
@@ -43,7 +76,7 @@ async function updateDeclarativeRules() {
     // Fetch rules from Node server
     const resp = await fetch(`${base}/rules`);
     if (!resp.ok) {
-      console.warn('[Mockery] Could not fetch rules for declarativeNetRequest:', resp.status);
+      log('warn', 'Could not fetch rules for declarativeNetRequest:', resp.status);
       return;
     }
 
@@ -79,7 +112,7 @@ async function updateDeclarativeRules() {
       let urlFilter;
       if (rule.isRegex) {
         // Skip regex rules for declarativeNetRequest due to complexity
-        console.warn('[Mockery] Skipping regex rule for declarativeNetRequest:', rule.pattern);
+        log('warn', 'Skipping regex rule for declarativeNetRequest:', rule.pattern);
         continue;
       } else {
         if (rule.pattern.startsWith('http')) {
@@ -120,10 +153,10 @@ async function updateDeclarativeRules() {
       addRules: declarativeRules
     });
 
-    console.log(`[Mockery] Updated declarativeNetRequest rules: ${declarativeRules.length} active`);
+    log('debug', `Updated declarativeNetRequest rules: ${declarativeRules.length} active`);
 
   } catch (err) {
-    console.error('[Mockery] Error updating declarativeNetRequest rules:', err);
+    log('error', 'Error updating declarativeNetRequest rules:', err);
   }
 }
 
@@ -174,7 +207,7 @@ function connectSSE() {
                 try {
                   const event = JSON.parse(line.slice(6));
                   if (event.type === 'config-changed') {
-                    console.log('[Mockery] Config changed, notifying tabs…');
+                    log('debug', 'Config changed, notifying tabs…');
                     notifyAllTabs();
                     updateDeclarativeRules();
                   }
@@ -246,7 +279,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const method = (message.method || 'GET').toUpperCase();
       const url = `${base}/resolve?url=${encodeURIComponent(message.url)}&method=${encodeURIComponent(method)}`;
 
-      const resp = await fetch(url);
+      // Forward body to server when present so handlers can inspect it
+      const fetchInit = (typeof message.body === 'string' && message.body.length > 0)
+        ? { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: message.body }
+        : undefined;
+
+      const resp = await fetch(url, fetchInit);
 
       if (!resp.ok) {
         const body = await resp.text();
@@ -255,6 +293,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       const mime = resp.headers.get('content-type') || 'application/json';
+      const handlerLogs = resp.headers.get('x-mockery-logs') || null;
 
       // Handle binary vs text data properly
       let body;
@@ -290,9 +329,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         recentActivity: recentActivity.slice(0, 20),
       });
 
-      sendResponse({ body, mime, isBinary });
+      sendResponse({ body, mime, isBinary, handlerLogs });
     } catch (err) {
-      console.error('[Mockery] Error resolving mock:', err);
+      log('error', 'Error resolving mock:', err);
       sendResponse({ error: err.message });
     }
   })();
