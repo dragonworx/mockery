@@ -136,8 +136,7 @@ window.addEventListener('message', async (event) => {
         handlerLogs: result.handlerLogs || null,
       }, '*');
 
-      // Replay handler logs in the ISOLATED-world console too (visible in page DevTools)
-      replayHandlerLogs(result.handlerLogs, url);
+      // Handler logs are replayed in injector.js (MAIN world) — don't double-log here.
 
       showToast(url, result.file, 'success');
     } else {

@@ -10,92 +10,26 @@ export default [
     method: "POST",
     isRegex: true,
     handler: async (request) => {
-      log.info('🎯 ADOBE INTERACT HANDLER FIRED', { method: request.method, url: request.url });
-      log.debug('body length:', request.body?.length ?? 0);
-      if (!request.body) {
-        log.warn('request.body is empty — extension may not be forwarding the body. Reload the extension at chrome://extensions/');
-      }
-
-      // ── Log dynamic context from the URL ────────────────────────────────
-      const requestId = request.query.get('requestId');
-      const configId = request.query.get('configId');
-      const silent = request.query.get('silent');
-      if (requestId || configId || silent) {
-        log.info('url params:', { requestId, configId, silent });
-      }
-
-      // ── Parse the JSON body and log key fields ──────────────────────────
-      let parsed: any = null;
+      // Extract CONTROL DETAILS from the first event in the interact payload
       try {
-        parsed = request.body ? JSON.parse(request.body) : null;
-      } catch (err) {
-        log.warn('failed to parse interact body:', (err as Error).message);
-      }
+        const parsed = request.body ? JSON.parse(request.body) : null;
+        const evt = parsed?.events?.[0];
+        const xdm = evt?.xdm ?? {};
+        const interaction = xdm?.web?.webInteraction ?? {};
+        const cba = xdm?._commonwealthbankau ?? {};
 
-      if (parsed) {
-        // Top-level meta + query info
-        const datasetId = parsed?.meta?.konductorConfig?.streaming?.datasetId
-          ?? parsed?.meta?.konductorConfig?.datasetId;
-        const orgId = parsed?.meta?.state?.domain
-          ?? parsed?.meta?.konductorConfig?.imsOrgId;
-        const decisionScopes: string[] = parsed?.query?.personalization?.decisionScopes ?? [];
-        const surfaces: string[] = parsed?.query?.personalization?.surfaces ?? [];
-        const identityMap = parsed?.xdm?.identityMap ?? parsed?.identityMap;
-        const ecid = identityMap?.ECID?.[0]?.id;
+        const controlId = interaction.name
+          ?? interaction.URL
+          ?? evt?.data?.__adobe?.target?.mbox;
+        const interactionName = cba?.interaction?.interactionName;
+        const controlType = cba?.trackingDetails?.controlType;
+        const bladeName = cba?.page?.bladeName;
 
-        log.info('meta:', { datasetId, orgId });
-        if (decisionScopes.length) log.info('decisionScopes:', decisionScopes);
-        if (surfaces.length) log.info('surfaces:', surfaces);
-        if (ecid) log.info('ECID:', ecid);
-
-        // Per-event details
-        const events: any[] = Array.isArray(parsed?.events) ? parsed.events : [];
-        if (!events.length) log.warn('🎯 CONTROL ID — (no events in payload)');
-
-        events.forEach((evt, i) => {
-          const xdm = evt?.xdm ?? {};
-          const data = evt?.data ?? {};
-          const web = xdm.web ?? {};
-          const interaction = web.webInteraction ?? {};
-          const page = web.webPageDetails ?? {};
-          const decisioning = xdm._experience?.decisioning;
-
-          const controlId = interaction.name
-            ?? interaction.URL
-            ?? data?.__adobe?.target?.mbox
-            ?? decisioning?.propositions?.[0]?.id;
-
-          const cba = xdm._commonwealthbankau ?? {};
-          const interactionName = cba?.interaction?.interactionName;
-          const controlType = cba?.trackingDetails?.controlType;
-          const bladeName = cba?.page?.bladeName;
-
-          log.info(`🎯 CONTROL ID [event ${i}]`, controlId ?? '(none)');
-          if (interactionName || controlType || bladeName) {
-            log.info('   ↳', { interactionName, controlType, blade: bladeName });
-          }
-
-          log.debug(`event[${i}] full:`, {
-            eventType: xdm.eventType,
-            controlId,
-            interactionName,
-            interaction: {
-              name: interaction.name,
-              type: interaction.type,
-              linkClicks: interaction.linkClicks?.value,
-              URL: interaction.URL,
-            },
-            page: {
-              name: page.name,
-              URL: page.URL,
-              siteSection: page.siteSection,
-              pageViews: page.pageViews?.value,
-            },
-            timestamp: xdm.timestamp,
-            propositions: decisioning?.propositions?.map((p: any) => p.id),
-            customDataKeys: Object.keys(data),
-          });
-        });
+        if (interactionName || controlType || bladeName) {
+          log.info('CONTROL DETAILS', { controlId, interactionName, controlType, blade: bladeName });
+        }
+      } catch {
+        // ignore parse errors
       }
 
       return {
