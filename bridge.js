@@ -138,7 +138,7 @@ window.addEventListener('message', async (event) => {
 
       // Handler logs are replayed in injector.js (MAIN world) — don't double-log here.
 
-      showToast(url, result.file, 'success');
+      showToast(url, result.file, 'success', null, result.handlerLogs || null);
     } else {
       window.postMessage({
         channel: CHANNEL,
@@ -209,6 +209,58 @@ function decodeHandlerLogs(encoded) {
   } catch {
     return null;
   }
+}
+
+// Render the captured handler logs as a list inside a success toast.
+function buildHandlerLogsHtml(encoded, mutedColor, textColor, accentColor) {
+  if (!encoded) return '';
+  const decoded = decodeHandlerLogs(encoded);
+  const logs = decoded?.logs;
+  if (!Array.isArray(logs) || logs.length === 0) return '';
+
+  const levelStyles = {
+    log:   { fg: '#475569', bg: '#f1f5f9' },
+    info:  { fg: '#1e40af', bg: '#dbeafe' },
+    warn:  { fg: '#92400e', bg: '#fef3c7' },
+    error: { fg: '#991b1b', bg: '#fee2e2' },
+    debug: { fg: '#3730a3', bg: '#e0e7ff' },
+  };
+
+  const items = logs.map((entry) => {
+    const lvl = entry.level || 'log';
+    const c = levelStyles[lvl] || levelStyles.log;
+    const args = Array.isArray(entry.args) ? entry.args : [];
+    const text = args.map(formatLogArg).join(' ');
+    return `
+      <li style="display:flex;gap:6px;align-items:flex-start;padding:2px 0;list-style:none;">
+        <span style="flex:0 0 auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10px;font-weight:700;color:${c.fg};background:${c.bg};padding:1px 5px;border-radius:3px;line-height:1.5;">${escapeHtml(lvl.toUpperCase())}</span>
+        <span style="flex:1 1 auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:${textColor};white-space:pre-wrap;word-break:break-word;">${escapeHtml(text)}</span>
+      </li>
+    `;
+  }).join('');
+
+  return `
+    <div style="margin-top:8px;padding-top:6px;border-top:1px dashed ${mutedColor};">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.4px;color:${accentColor};margin-bottom:4px;">HANDLER LOGS (${logs.length})</div>
+      <ul style="margin:0;padding:0;max-height:200px;overflow:auto;">${items}</ul>
+    </div>
+  `;
+}
+
+// Render one log argument as a compact single-line string for the toast.
+function formatLogArg(value) {
+  if (value === null || value === undefined) return String(value);
+  const t = typeof value;
+  if (t === 'string') return value;
+  if (t === 'number' || t === 'boolean' || t === 'bigint') return String(value);
+  if (value && typeof value === 'object') {
+    if (value.__type === 'Error') return `${value.name || 'Error'}: ${value.message || ''}`;
+    if (value.__type === 'Date') return value.iso;
+    if (value.__type === 'RegExp') return `/${value.source}/${value.flags || ''}`;
+    try { return JSON.stringify(value); }
+    catch { return '[object]'; }
+  }
+  return String(value);
 }
 
 // Inverse of server-side safeSerialize: turn sentinel-tagged objects back into
@@ -327,6 +379,17 @@ function dismissAllToasts() {
   for (const t of Array.from(toastList.children)) dismissToast(t);
 }
 
+// Pressing Escape dismisses any open Mockery toasts.
+// Captured at document level (capture phase) so it works even when focus is
+// inside a contenteditable / iframe-free input on the page.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!toastList) return;
+  const active = Array.from(toastList.children).filter(t => !t.__dismissed);
+  if (active.length === 0) return;
+  dismissAllToasts();
+}, true);
+
 function updateDismissAllVisibility() {
   if (!dismissAllBtn || !toastList) return;
   const active = Array.from(toastList.children).filter(t => !t.__dismissed).length;
@@ -406,7 +469,7 @@ function splitUrl(url) {
   }
 }
 
-function showToast(url, file, type = 'success', errorInfoOrMessage = null) {
+function showToast(url, file, type = 'success', errorInfoOrMessage = null, encodedHandlerLogs = null) {
   const list = ensureToastContainer();
   const isError = type === 'error';
   const toast = document.createElement('div');
@@ -420,8 +483,9 @@ function showToast(url, file, type = 'success', errorInfoOrMessage = null) {
   const label          = isError ? 'MOCK ERROR' : 'MOCKED';
   const icon           = isError ? '❌' : '🔄';
 
-  // Error toasts get extra width to fit stack traces
-  const maxWidth = isError ? 'min(880px, calc(100vw - 40px))' : 'min(720px, calc(100vw - 40px))';
+  // Error toasts get extra width to fit stack traces; success toasts widen too when logs are present.
+  const hasHandlerLogs = !isError && !!encodedHandlerLogs;
+  const maxWidth = (isError || hasHandlerLogs) ? 'min(880px, calc(100vw - 40px))' : 'min(720px, calc(100vw - 40px))';
 
   toast.style.cssText = `
     position: relative;
@@ -436,8 +500,8 @@ function showToast(url, file, type = 'success', errorInfoOrMessage = null) {
     max-width: ${maxWidth};
     width: max-content;
     pointer-events: auto;
-    cursor: ${isError ? 'default' : 'pointer'};
-    ${isError ? '' : 'user-select: none; -webkit-user-select: none;'}
+    cursor: ${(isError || hasHandlerLogs) ? 'default' : 'pointer'};
+    ${(isError || hasHandlerLogs) ? '' : 'user-select: none; -webkit-user-select: none;'}
     opacity: 0; transform: translateX(100%);
     transition: all 0.3s ease-out;
   `;
@@ -485,8 +549,13 @@ function showToast(url, file, type = 'success', errorInfoOrMessage = null) {
       ${stackHtml}
     `;
   } else {
+    const logsHtml = buildHandlerLogsHtml(encodedHandlerLogs, mutedColor, textColor, accentColor);
+    const closeBtn = hasHandlerLogs
+      ? `<button type="button" data-mockery-close style="position:absolute;top:6px;right:8px;background:transparent;border:none;color:${mutedColor};font-size:16px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:3px;" title="Dismiss">×</button>`
+      : '';
     toast.innerHTML = `
-      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;margin-bottom:4px;">
+      ${closeBtn}
+      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;margin-bottom:4px;${hasHandlerLogs ? 'padding-right:18px;' : ''}">
         <span style="color:${mutedColor};">${escapeHtml(origin)}</span><span style="font-weight:600;color:${textColor};">${escapeHtml(path)}</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
@@ -494,12 +563,18 @@ function showToast(url, file, type = 'success', errorInfoOrMessage = null) {
         <span style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:${accentColor};">${label}</span>
         <span style="font-size:12px;color:${mutedColor};">→ ${escapeHtml(file || 'stub')}</span>
       </div>
+      ${logsHtml}
     `;
   }
 
   if (isError) {
     // Only the explicit close button dismisses an error toast — keep auto-timer too,
     // but allow text selection / details expansion inside.
+    const closeEl = toast.querySelector('[data-mockery-close]');
+    if (closeEl) closeEl.addEventListener('click', (e) => { e.stopPropagation(); dismissToast(toast); });
+    toast.title = 'Click × to dismiss';
+  } else if (hasHandlerLogs) {
+    // Success-with-logs: avoid click-to-dismiss so users can scroll/select inside.
     const closeEl = toast.querySelector('[data-mockery-close]');
     if (closeEl) closeEl.addEventListener('click', (e) => { e.stopPropagation(); dismissToast(toast); });
     toast.title = 'Click × to dismiss';

@@ -26,7 +26,7 @@ export default [
         const bladeName = cba?.page?.bladeName;
 
         if (interactionName || controlType || bladeName) {
-          log.info('CONTROL DETAILS', { controlId, interactionName, controlType, blade: bladeName });
+          log.info(`"${controlId}"\n`, { interactionName, controlType, blade: bladeName });
         }
       } catch {
         // ignore parse errors
