@@ -109,11 +109,11 @@
     if (event.source !== window) return;
     if (!event.data || event.data.channel !== CHANNEL) return;
     if (event.data.type === 'MOCK_RESPONSE') {
-      const { id, body, mime, error, handlerLogs } = event.data;
+      const { id, body, mime, error, handlerLogs, mockeryMatch } = event.data;
       const resolve = _pending.get(id);
       if (resolve) {
         _pending.delete(id);
-        resolve(error ? null : { body, mime, handlerLogs });
+        resolve(error ? null : { body, mime, handlerLogs, mockeryMatch });
       }
     }
   });
@@ -126,6 +126,41 @@
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       return JSON.parse(new TextDecoder('utf-8').decode(bytes));
     } catch { return null; }
+  }
+
+  // Decode the X-Mockery-Match base64-JSON header into { start, end, ... }
+  function decodeMockeryMatch(encoded) {
+    if (!encoded) return null;
+    try {
+      const binary = atob(encoded);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return JSON.parse(new TextDecoder('utf-8').decode(bytes));
+    } catch { return null; }
+  }
+
+  // Build %c-style format args that render the URL with the matched portion
+  // highlighted (yellow bg + dark text) in DevTools. Returns { fmt, styles }.
+  // Caller embeds `fmt` into a console.log/groupCollapsed format string and
+  // spreads `styles` into the args.
+  function formatUrlWithMatch(url, match, baseStyle) {
+    const highlightStyle =
+      'background:#fde68a;color:#7c2d12;padding:0 2px;border-radius:2px;font-weight:bold';
+    if (!match || match.start >= url.length || match.end <= 0 || match.end <= match.start) {
+      return { fmt: `%c${url}%c`, styles: [baseStyle, 'color:inherit;font-weight:normal'] };
+    }
+    const s = Math.max(0, match.start);
+    const e = Math.min(url.length, match.end);
+    const before = url.slice(0, s);
+    const hit = url.slice(s, e);
+    const after = url.slice(e);
+    const parts = [];
+    const styles = [];
+    if (before) { parts.push(`%c${before}`); styles.push(baseStyle); }
+    parts.push(`%c${hit}`); styles.push(highlightStyle);
+    if (after) { parts.push(`%c${after}`); styles.push(baseStyle); }
+    parts.push('%c'); styles.push('color:inherit;font-weight:normal');
+    return { fmt: parts.join(''), styles };
   }
 
   function reviveLogArg(value) {
@@ -231,10 +266,11 @@
           try { parsedMock = JSON.parse(mock.body); } catch { parsedMock = mock.body; }
 
           const [pBold, pReset] = prefixStyles('info');
+          const urlPart = formatUrlWithMatch(url, decodeMockeryMatch(mock.mockeryMatch), 'color:#06b6d4');
           console.groupCollapsed(
-            `%c${LOG_BANNER}%c ${method} %c${url}%c → %c${rule.file || 'handler'}`,
+            `%c${LOG_BANNER}%c ${method} ${urlPart.fmt} → %c${rule.file || 'handler'}`,
             pBold, pReset,
-            'color:#06b6d4', 'color:inherit',
+            ...urlPart.styles,
             'color:#10b981;font-weight:bold'
           );
           const reqBody = init?.body;
@@ -317,10 +353,11 @@
       try { parsedMock = JSON.parse(mock.body); } catch { parsedMock = mock.body; }
       if (shouldLog('info')) {
         const [pBold, pReset] = prefixStyles('info');
+        const urlPart = formatUrlWithMatch(url, decodeMockeryMatch(mock.mockeryMatch), 'color:#06b6d4');
         console.groupCollapsed(
-          `%c${LOG_BANNER}%c ${xhrMethod} %c${url}%c → %c${rule.file || 'handler'}`,
+          `%c${LOG_BANNER}%c ${xhrMethod} ${urlPart.fmt} → %c${rule.file || 'handler'}`,
           pBold, pReset,
-          'color:#06b6d4', 'color:inherit',
+          ...urlPart.styles,
           'color:#10b981;font-weight:bold'
         );
         let parsedReqBody = body;

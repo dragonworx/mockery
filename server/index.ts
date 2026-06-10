@@ -65,6 +65,14 @@ export interface HandlerResponse {
 
 export type HandlerFunction = (request: HandlerRequest, originalResponse: HandlerResponse | null) => Promise<HandlerResponse>;
 
+export interface MatchInfo {
+  start: number;
+  end: number;
+  pattern: string;
+  isRegex: boolean;
+  kind: 'exact' | 'regex' | 'substring';
+}
+
 interface CachedHandler {
   handler: HandlerFunction;
   mtime: Date;
@@ -394,9 +402,14 @@ async function resolveWithHandler(
   rule: MockRule,
   req: Request,
   targetMethod: string,
-  body: string | null = null
+  body: string | null = null,
+  match: MatchInfo | null = null
 ): Promise<HandlerResponse | null> {
   let originalResponse: HandlerResponse | null = null;
+
+  const matchHeader: Record<string, string> = match
+    ? { 'X-Mockery-Match': encodeMockeryMatch(match) }
+    : {};
 
   // Load file response if specified
   if (rule.file) {
@@ -434,13 +447,12 @@ async function resolveWithHandler(
           throw new Error('Handler must return a response object');
         }
 
-        console.log(`${LOG_BANNER} ${targetMethod || req.method} ${targetUrl} → ${handlerName} (handler)`);
-
         // Attach captured logs as a custom header so the browser can replay them.
         const merged: HandlerResponse = {
           ...result,
           headers: {
             ...(result.headers || {}),
+            ...matchHeader,
             ...(logs.length ? { 'X-Mockery-Logs': encodeMockeryLogs(logs, handlerName) } : {}),
           },
         };
@@ -469,6 +481,12 @@ async function resolveWithHandler(
     }
   }
 
+  if (originalResponse) {
+    return {
+      ...originalResponse,
+      headers: { ...originalResponse.headers, ...matchHeader },
+    };
+  }
   return originalResponse;
 }
 
@@ -559,7 +577,12 @@ function guessMime(filePath: string): string {
 }
 
 // ── Matching ────────────────────────────────────────────────────────────────
-function findMatch(url: string, method: string): MockRule | null {
+interface MatchResult {
+  rule: MockRule;
+  match: MatchInfo;
+}
+
+function findMatch(url: string, method: string): MatchResult | null {
   const normalizedMethod = (method || 'GET').toUpperCase();
 
   function methodMatches(rule: MockRule): boolean {
@@ -573,13 +596,18 @@ function findMatch(url: string, method: string): MockRule | null {
       if (rule.enabled === false) continue;
       if (!methodMatches(rule)) continue;
       if (rule.isRegex) {
-        if (new RegExp(rule.pattern).test(url)) {
-          return rule;
+        const m = new RegExp(rule.pattern).exec(url);
+        if (m) {
+          return {
+            rule,
+            match: { start: m.index, end: m.index + m[0].length, pattern: rule.pattern, isRegex: true, kind: 'regex' },
+          };
         }
-      } else {
-        if (url === rule.pattern) {
-          return rule;
-        }
+      } else if (url === rule.pattern) {
+        return {
+          rule,
+          match: { start: 0, end: url.length, pattern: rule.pattern, isRegex: false, kind: 'exact' },
+        };
       }
     } catch {
       // bad regex — skip
@@ -592,8 +620,12 @@ function findMatch(url: string, method: string): MockRule | null {
       if (rule.enabled === false) continue;
       if (!methodMatches(rule)) continue;
       if (!rule.isRegex) {
-        if (url.includes(rule.pattern)) {
-          return rule;
+        const idx = url.indexOf(rule.pattern);
+        if (idx !== -1) {
+          return {
+            rule,
+            match: { start: idx, end: idx + rule.pattern.length, pattern: rule.pattern, isRegex: false, kind: 'substring' },
+          };
         }
       }
     } catch {
@@ -602,6 +634,34 @@ function findMatch(url: string, method: string): MockRule | null {
   }
 
   return null;
+}
+
+// Encode match info for transport over an HTTP response header.
+function encodeMockeryMatch(match: MatchInfo): string {
+  try {
+    return Buffer.from(JSON.stringify(match), 'utf8').toString('base64');
+  } catch {
+    return '';
+  }
+}
+
+// ANSI helpers for highlighting the matched URL portion in the server console.
+const ANSI_RESET = '\x1b[0m';
+const ANSI_DIM = '\x1b[2m';
+const ANSI_HIGHLIGHT = '\x1b[1;96m'; // bold bright cyan
+
+function ansiHighlightUrl(url: string, match: MatchInfo): string {
+  const before = url.slice(0, match.start);
+  const hit = url.slice(match.start, match.end);
+  const after = url.slice(match.end);
+  return `${ANSI_DIM}${before}${ANSI_RESET}${ANSI_HIGHLIGHT}${hit}${ANSI_RESET}${ANSI_DIM}${after}${ANSI_RESET}`;
+}
+
+function logMockServed(method: string, url: string, rule: MockRule, match: MatchInfo): void {
+  const target = rule.handler
+    ? `${typeof rule.handler === 'function' ? 'inline function' : rule.handler} (handler)`
+    : rule.file ?? '(no body)';
+  console.log(`${LOG_BANNER} ${method} ${ansiHighlightUrl(url, match)} → ${target}`);
 }
 
 // ── HTTP server (Bun.serve) ─────────────────────────────────────────────────
@@ -617,7 +677,7 @@ const server = Bun.serve({
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': '*',
-      'Access-Control-Expose-Headers': 'X-Mockery-Logs, Content-Type',
+      'Access-Control-Expose-Headers': 'X-Mockery-Logs, X-Mockery-Match, Content-Type',
     };
 
     if (req.method === 'OPTIONS') {
@@ -633,13 +693,14 @@ const server = Bun.serve({
 
       const targetMethod = (url.searchParams.get('method') || 'GET').toUpperCase();
 
-      const rule = findMatch(targetUrl, targetMethod);
-      if (!rule) {
+      const matched = findMatch(targetUrl, targetMethod);
+      if (!matched) {
         return Response.json(
           { error: 'No matching rule', url: targetUrl, method: targetMethod },
           { status: 404, headers: corsHeaders }
         );
       }
+      const { rule, match } = matched;
 
       try {
         // Read forwarded body if present (POST from background.js when page sent a body)
@@ -650,7 +711,7 @@ const server = Bun.serve({
           if (forwardedBody === '') forwardedBody = null;
         }
 
-        const result = await resolveWithHandler(targetUrl, rule, req, targetMethod, forwardedBody);
+        const result = await resolveWithHandler(targetUrl, rule, req, targetMethod, forwardedBody, match);
 
         if (!result) {
           return Response.json(
@@ -658,6 +719,8 @@ const server = Bun.serve({
             { status: 404, headers: corsHeaders }
           );
         }
+
+        logMockServed(targetMethod || req.method, targetUrl, rule, match);
 
         const status = result.status || 200;
         const headers = { ...corsHeaders, ...result.headers };
@@ -688,8 +751,18 @@ const server = Bun.serve({
         );
       }
 
+      // For pattern-based resolution the "URL" is the pattern itself, so the
+      // entire string is the matched range.
+      const match: MatchInfo = {
+        start: 0,
+        end: pattern.length,
+        pattern,
+        isRegex: rule.isRegex ?? false,
+        kind: rule.isRegex ? 'regex' : 'exact',
+      };
+
       try {
-        const result = await resolveWithHandler(pattern, rule, req, 'GET');
+        const result = await resolveWithHandler(pattern, rule, req, 'GET', null, match);
 
         if (!result) {
           return Response.json(
@@ -697,6 +770,8 @@ const server = Bun.serve({
             { status: 404, headers: corsHeaders }
           );
         }
+
+        logMockServed('GET', pattern, rule, match);
 
         const status = result.status || 200;
         const headers = { ...corsHeaders, ...result.headers };

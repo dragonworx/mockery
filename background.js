@@ -299,6 +299,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       const mime = resp.headers.get('content-type') || 'application/json';
       const handlerLogs = resp.headers.get('x-mockery-logs') || null;
+      const mockeryMatch = resp.headers.get('x-mockery-match') || null;
 
       // Handle binary vs text data properly
       let body;
@@ -334,7 +335,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         recentActivity: recentActivity.slice(0, 20),
       });
 
-      sendResponse({ body, mime, isBinary, handlerLogs });
+      sendResponse({ body, mime, isBinary, handlerLogs, mockeryMatch });
     } catch (err) {
       log('error', 'Error resolving mock:', err);
       sendResponse({ error: err.message });

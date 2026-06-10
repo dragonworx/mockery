@@ -139,11 +139,12 @@ window.addEventListener('message', async (event) => {
         body: result.body,
         mime: result.mime,
         handlerLogs: result.handlerLogs || null,
+        mockeryMatch: result.mockeryMatch || null,
       }, '*');
 
       // Handler logs are replayed in injector.js (MAIN world) — don't double-log here.
 
-      showToast(url, result.file, 'success', null, result.handlerLogs || null);
+      showToast(url, result.file, 'success', null, result.handlerLogs || null, result.mockeryMatch || null);
     } else {
       window.postMessage({
         channel: CHANNEL,
@@ -474,7 +475,37 @@ function splitUrl(url) {
   }
 }
 
-function showToast(url, file, type = 'success', errorInfoOrMessage = null, encodedHandlerLogs = null) {
+// Decode the X-Mockery-Match base64-JSON header into { start, end, pattern, isRegex, kind }.
+function decodeMockeryMatch(encoded) {
+  if (!encoded) return null;
+  try {
+    const binary = atob(encoded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return JSON.parse(new TextDecoder('utf-8').decode(bytes));
+  } catch { return null; }
+}
+
+// Render a URL substring (start..end of the full url) with the overlapping
+// portion of [matchStart, matchEnd) highlighted. Returns HTML.
+function renderUrlSegment(fullUrl, segStart, segEnd, match, baseColor, highlightStyle) {
+  const segment = fullUrl.slice(segStart, segEnd);
+  if (!match || match.end <= segStart || match.start >= segEnd) {
+    return `<span style="color:${baseColor};">${escapeHtml(segment)}</span>`;
+  }
+  const hitStart = Math.max(match.start, segStart) - segStart;
+  const hitEnd = Math.min(match.end, segEnd) - segStart;
+  const before = segment.slice(0, hitStart);
+  const hit = segment.slice(hitStart, hitEnd);
+  const after = segment.slice(hitEnd);
+  return (
+    `<span style="color:${baseColor};">${escapeHtml(before)}</span>` +
+    `<mark style="${highlightStyle}">${escapeHtml(hit)}</mark>` +
+    `<span style="color:${baseColor};">${escapeHtml(after)}</span>`
+  );
+}
+
+function showToast(url, file, type = 'success', errorInfoOrMessage = null, encodedHandlerLogs = null, encodedMatch = null) {
   const list = ensureToastContainer();
   const isError = type === 'error';
   const toast = document.createElement('div');
@@ -511,7 +542,13 @@ function showToast(url, file, type = 'success', errorInfoOrMessage = null, encod
     transition: all 0.3s ease-out;
   `;
 
-  const { origin, path } = splitUrl(url);
+  const { origin } = splitUrl(url);
+  const match = decodeMockeryMatch(encodedMatch);
+  // Highlight style for the matched portion of the URL — used in both success and error toasts.
+  const highlightStyle = `background:#fde68a;color:#7c2d12;padding:0 2px;border-radius:2px;font-weight:700;`;
+  const originLen = origin.length;
+  const originHtml = renderUrlSegment(url, 0, originLen, match, mutedColor, highlightStyle);
+  const pathHtml = renderUrlSegment(url, originLen, url.length, match, textColor, highlightStyle);
 
   if (isError) {
     // Normalize: support legacy string customMessage as well as structured info
@@ -548,7 +585,7 @@ function showToast(url, file, type = 'success', errorInfoOrMessage = null, encod
         <span style="font-size:12px;color:${textColor};font-weight:600;">${escapeHtml(info.summary || 'Unknown error')}</span>
       </div>
       <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;">
-        <span style="color:${mutedColor};">${escapeHtml(origin)}</span><span style="font-weight:600;color:${textColor};">${escapeHtml(path)}</span>
+        ${originHtml}${pathHtml}
       </div>
       ${metaHtml}
       ${stackHtml}
@@ -561,7 +598,7 @@ function showToast(url, file, type = 'success', errorInfoOrMessage = null, encod
     toast.innerHTML = `
       ${closeBtn}
       <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;${hasHandlerLogs ? 'padding-right:18px;' : ''}">
-        <span style="font-weight:600;color:${textColor};">${escapeHtml(path)}</span>
+        ${match && match.start < originLen ? originHtml : ''}${pathHtml}
       </div>
       ${logsHtml}
     `;
