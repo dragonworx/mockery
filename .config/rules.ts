@@ -3,6 +3,7 @@
 
 import type { MockRule } from '../server/index.ts';
 import { log } from '../server/index.ts';
+import logControlIds from '../mocks/handlers/log-control-ids.ts';
 
 export default [
   {
@@ -84,6 +85,7 @@ export default [
     file: "aem/landing.json",
     isRegex: true,
     enabled: true,
+    handler: logControlIds,
   },
   {
     pattern: "/add-recipient\\.smtnbnxt\\.json($|\\?)",
@@ -91,6 +93,7 @@ export default [
     file: "aem/add.json",
     isRegex: true,
     enabled: true,
+    handler: logControlIds,
   },
   {
     pattern: "/edit-recipient\\.smtnbnxt\\.json($|\\?)",
@@ -98,6 +101,7 @@ export default [
     file: "aem/edit.json",
     isRegex: true,
     enabled: true,
+    handler: logControlIds,
   },
   {
     pattern: "/import-recipients\\.smtnbnxt\\.json($|\\?)",
@@ -105,5 +109,6 @@ export default [
     file: "aem/import.json",
     isRegex: true,
     enabled: true,
+    handler: logControlIds,
   }
 ] satisfies MockRule[];

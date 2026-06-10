@@ -28,7 +28,7 @@
  *   - Can be combined with file to modify existing response
  */
 
-import { watch, existsSync, readFileSync, writeFileSync, statSync } from 'fs';
+import { watch, existsSync, readFileSync, writeFileSync, statSync, mkdirSync } from 'fs';
 import { join, resolve, extname, dirname, isAbsolute } from 'path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
@@ -125,6 +125,7 @@ function loadOverrides(): Record<string, boolean> {
 }
 
 function saveOverrides(obj: Record<string, boolean>): void {
+  mkdirSync(dirname(overridesPath), { recursive: true });
   writeFileSync(overridesPath, JSON.stringify(obj, null, 2));
 }
 
@@ -170,7 +171,36 @@ function applyOverrides(): void {
 // ── Config loading + hot-reload ─────────────────────────────────────────────
 let rules: MockRule[] = [];
 
+// Starter template written on first run when rules.ts is missing. The file is
+// gitignored and user-owned, so we only seed it when it doesn't exist.
+const STARTER_RULES_TS = `// Mockery Configuration
+// This file defines URL patterns and their corresponding mock responses.
+// It is gitignored — edit freely for your local setup.
+
+import type { MockRule } from '../server/index.ts';
+
+export default [
+  // Example:
+  // {
+  //   pattern: "https://api.example.com/users",
+  //   file: "users.json",
+  // },
+] satisfies MockRule[];
+`;
+
+function ensureConfigExists(): void {
+  if (existsSync(configPath)) return;
+  try {
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(configPath, STARTER_RULES_TS);
+    console.log(`${LOG_BANNER} Created starter config: ${configPath}`);
+  } catch (err: any) {
+    console.warn(`${LOG_BANNER} Could not create starter config at ${configPath}: ${err.message}`);
+  }
+}
+
 async function loadConfig(): Promise<void> {
+  ensureConfigExists();
   try {
     // Use dynamic import with cache-busting query string for hot-reload
     const module = await import(`${configPath}?t=${Date.now()}`);

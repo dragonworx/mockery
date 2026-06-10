@@ -3,3 +3,4 @@
 _metadata/
 node_modules/
 mocks/
+.config/rules.ts
