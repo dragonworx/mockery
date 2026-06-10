@@ -17,6 +17,10 @@
   let rules = [];
   let showNotifications = true;
 
+  // ── Log banners ────────────────────────────────────────────────────────────────
+  const LOG_BANNER = '✅';
+  const ERROR_BANNER = '❌';
+
   // ── Logger ─────────────────────────────────────────────────────────────────────
   const LOG_LEVELS = { silent: 0, error: 1, warn: 2, info: 3, debug: 4 };
   const LOG_COLORS = {
@@ -175,7 +179,7 @@
       const tag = `%c[${entry.level.toUpperCase()}]%c`;
       const tagStyles = [`color:${c.fg};font-weight:bold;background:${c.bg};padding:1px 4px;border-radius:3px`, 'color:inherit'];
       try { fn(tag, ...tagStyles, ...args); }
-      catch { try { fn('[Mockery] failed to replay log', entry); } catch { /* swallow */ } }
+      catch { try { fn(`${ERROR_BANNER} failed to replay log`, entry); } catch { /* swallow */ } }
     }
   }
 
@@ -228,7 +232,7 @@
 
           const [pBold, pReset] = prefixStyles('info');
           console.groupCollapsed(
-            `%c[Mockery]%c ${method} %c${url}%c → %c${rule.file || 'handler'}`,
+            `%c${LOG_BANNER}%c ${method} %c${url}%c → %c${rule.file || 'handler'}`,
             pBold, pReset,
             'color:#06b6d4', 'color:inherit',
             'color:#10b981;font-weight:bold'
@@ -264,7 +268,7 @@
         });
       } else if (shouldLog('warn')) {
         const [pBold, pReset] = prefixStyles('warn');
-        console.warn(`%c[Mockery]%c ${method} %c${url}%c — mock was null, falling through to network`, pBold, pReset, 'color:#06b6d4', 'color:inherit');
+        console.warn(`%c${LOG_BANNER}%c ${method} %c${url}%c — mock was null, falling through to network`, pBold, pReset, 'color:#06b6d4', 'color:inherit');
       }
     }
 
@@ -314,7 +318,7 @@
       if (shouldLog('info')) {
         const [pBold, pReset] = prefixStyles('info');
         console.groupCollapsed(
-          `%c[Mockery]%c ${xhrMethod} %c${url}%c → %c${rule.file || 'handler'}`,
+          `%c${LOG_BANNER}%c ${xhrMethod} %c${url}%c → %c${rule.file || 'handler'}`,
           pBold, pReset,
           'color:#06b6d4', 'color:inherit',
           'color:#10b981;font-weight:bold'
@@ -392,6 +396,6 @@
 
   if (shouldLog('debug')) {
     const [pBold, pReset] = prefixStyles('debug');
-    console.debug('%c[Mockery]%c Injector ready', pBold, pReset);
+    console.debug(`%c${LOG_BANNER}%c Injector ready`, pBold, pReset);
   }
 })();

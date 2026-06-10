@@ -207,9 +207,9 @@ Binary files are base64-encoded during transport and reconstructed as proper bin
 
 | Context         | Where to look                                    | Prefix       |
 |-----------------|--------------------------------------------------|--------------|
-| Page console    | DevTools > Console                               | `[Mockery]`  |
-| Service worker  | `chrome://extensions/` > service worker link     | `[Mockery]`  |
-| Server          | Terminal running the server                       | `[mockery]`     |
+| Page console    | DevTools > Console                               | `✅` / `❌`  |
+| Service worker  | `chrome://extensions/` > service worker link     | `✅` / `❌`  |
+| Server          | Terminal running the server                       | `✅` / `❌`     |
 | Extension popup | Activity tab in the popup UI                     | -            |
 
 ---

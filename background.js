@@ -7,7 +7,11 @@
 
 const DEFAULT_SERVER = 'http://localhost:8756';
 
-// ── Logger ──────────────────────────────────────────────────────────────────────
+// ── Log banners ──────────────────────────────────────────────────
+const LOG_BANNER = '✅';
+const ERROR_BANNER = '❌';
+
+// ── Logger ──────────────────────────────────────────────────────────────
 const LOG_LEVELS = { silent: 0, error: 1, warn: 2, info: 3, debug: 4 };
 const LOG_COLORS = {
   debug: '#64748b',
@@ -21,7 +25,8 @@ function shouldLog(level) {
 }
 function logPrefix(level) {
   const c = LOG_COLORS[level] || LOG_COLORS.info;
-  return [`%c[Mockery]%c`, `color:${c};font-weight:bold`, 'color:inherit'];
+  const banner = level === 'error' ? ERROR_BANNER : LOG_BANNER;
+  return [`%c${banner}%c`, `color:${c};font-weight:bold`, 'color:inherit'];
 }
 const LOG_METHOD_BY_LEVEL = { debug: 'debug', info: 'log', warn: 'warn', error: 'error' };
 function log(level, ...args) {

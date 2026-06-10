@@ -393,8 +393,8 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 - HTML escaping in popup UI to prevent XSS
 
 ### Debugging
-- MAIN world logs: Open page console, look for `[Mockery]`
-- ISOLATED world logs: Open page console, look for `[Mockery] ISOLATED bridge loaded`
+- MAIN world logs: Open page console, look for `✅` (or `❌` for errors)
+- ISOLATED world logs: Open page console, look for `✅ ISOLATED bridge loaded`
 - Background logs: Go to `chrome://extensions/` → "service worker" link
 - Server logs: Watch terminal where `bun run server/index.ts` is running
 - Activity tracking: Check "Activity" tab in extension popup

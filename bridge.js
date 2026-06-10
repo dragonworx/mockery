@@ -13,7 +13,11 @@ const CHANNEL = '__MOCKERY__';
 const DEFAULT_TOAST_DURATION_MS = 10000;
 let toastDurationMs = DEFAULT_TOAST_DURATION_MS;
 
-// ── Logger ───────────────────────────────────────────────────────────────────────────────
+// ── Log banners ────────────────────────────────────────────────────────────────────────
+const LOG_BANNER = '✅';
+const ERROR_BANNER = '❌';
+
+// ── Logger ────────────────────────────────────────────────────────────────────────────────────────────────────────
 const LOG_LEVELS = { silent: 0, error: 1, warn: 2, info: 3, debug: 4 };
 const LOG_COLORS = {
   debug: '#64748b',
@@ -27,7 +31,8 @@ function shouldLog(level) {
 }
 function logPrefix(level) {
   const c = LOG_COLORS[level] || LOG_COLORS.info;
-  return [`%c[Mockery]%c`, `color:${c};font-weight:bold`, 'color:inherit'];
+  const banner = level === 'error' ? ERROR_BANNER : LOG_BANNER;
+  return [`%c${banner}%c`, `color:${c};font-weight:bold`, 'color:inherit'];
 }
 const LOG_METHOD_BY_LEVEL = { debug: 'debug', info: 'log', warn: 'warn', error: 'error' };
 function log(level, ...args) {
@@ -194,7 +199,7 @@ function replayHandlerLogs(encoded, url) {
     try {
       fn(tag, ...tagStyles, ...args);
     } catch {
-      try { fn('[Mockery] failed to replay log', entry); } catch { /* swallow */ }
+      try { fn(`${ERROR_BANNER} failed to replay log`, entry); } catch { /* swallow */ }
     }
   }
 }

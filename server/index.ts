@@ -32,6 +32,10 @@ import { watch, existsSync, readFileSync, writeFileSync, statSync } from 'fs';
 import { join, resolve, extname, dirname, isAbsolute } from 'path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+// ── Log banners ──────────────────────────────────────────────────────────────
+const LOG_BANNER = '✅';
+const ERROR_BANNER = '❌';
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface MockRule {
@@ -77,12 +81,12 @@ if (existsSync(handlersPath)) {
       if (!filename || !filename.endsWith('.ts')) return;
       const filePath = join(handlersPath, filename);
 
-      console.log(`[mockery] Handler changed: .config/handlers/${filename}`);
+      console.log(`${LOG_BANNER} Handler changed: .config/handlers/${filename}`);
 
       // Clear from cache
       handlerCache.delete(filePath);
 
-      console.log('[mockery] Handler reloaded - next request will use updated version');
+      console.log(`${LOG_BANNER} Handler reloaded - next request will use updated version`);
     });
   } catch {
     // fs.watch recursive not supported on this platform — handlers won't hot reload
@@ -148,7 +152,7 @@ function migrateOverrides(overrides: Record<string, boolean>): Record<string, bo
 
   if (migratedAny) {
     saveOverrides(migrated);
-    console.log('[mockery] Migrated rule-overrides.json from index-based to pattern-based keys');
+    console.log(`${LOG_BANNER} Migrated rule-overrides.json from index-based to pattern-based keys`);
   }
   return migrated;
 }
@@ -178,13 +182,13 @@ async function loadConfig(): Promise<void> {
 
     rules = loadedRules;
     applyOverrides();
-    console.log(`[mockery] Loaded ${rules.length} rule(s) from ${configPath}`);
+    console.log(`${LOG_BANNER} Loaded ${rules.length} rule(s) from ${configPath}`);
   } catch (err: any) {
     if (err.code === 'ENOENT' || err.code === 'ERR_MODULE_NOT_FOUND') {
-      console.warn(`[mockery] Config not found: ${configPath} — starting with 0 rules`);
+      console.warn(`${LOG_BANNER} Config not found: ${configPath} — starting with 0 rules`);
       rules = [];
     } else {
-      console.error(`[mockery] Error reading config:`, err.message);
+      console.error(`${ERROR_BANNER} Error reading config:`, err.message);
       rules = [];
     }
   }
@@ -195,7 +199,7 @@ await loadConfig();
 try {
   watch(configPath, { persistent: false }, (eventType) => {
     if (eventType === 'change' || eventType === 'rename') {
-      console.log('[mockery] Config changed, reloading…');
+      console.log(`${LOG_BANNER} Config changed, reloading…`);
       loadConfig().then(() => broadcastConfigChange());
     }
   });
@@ -252,7 +256,7 @@ async function loadHandler(handlerOrPath: HandlerFunction | string): Promise<Han
 
     return handler;
   } catch (error: any) {
-    console.error(`[mockery] Error loading handler ${handlerOrPath}:`, error.message);
+    console.error(`${ERROR_BANNER} Error loading handler ${handlerOrPath}:`, error.message);
     return null;
   }
 }
@@ -325,7 +329,7 @@ function emit(level: CapturedLog['level'], args: unknown[]) {
     try {
       ctx.logs.push({ level, args: args.map(a => safeSerialize(a)) });
     } catch {
-      ctx.logs.push({ level, args: ['[Mockery] failed to serialize log args'] });
+      ctx.logs.push({ level, args: [`${ERROR_BANNER} failed to serialize log args`] });
     }
   } else {
     // Called outside a handler request — just print locally.
@@ -376,7 +380,7 @@ async function resolveWithHandler(
           body: content.toString()
         };
       } catch (err: any) {
-        console.error(`[mockery] Error reading file ${filePath}:`, err.message);
+        console.error(`${ERROR_BANNER} Error reading file ${filePath}:`, err.message);
         return {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
@@ -400,7 +404,7 @@ async function resolveWithHandler(
           throw new Error('Handler must return a response object');
         }
 
-        console.log(`[mockery] ${targetMethod || req.method} ${targetUrl} → ${handlerName} (handler)`);
+        console.log(`${LOG_BANNER} ${targetMethod || req.method} ${targetUrl} → ${handlerName} (handler)`);
 
         // Attach captured logs as a custom header so the browser can replay them.
         const merged: HandlerResponse = {
@@ -412,7 +416,7 @@ async function resolveWithHandler(
         };
         return merged;
       } catch (err: any) {
-        console.error(`[mockery] Handler execution error for ${handlerName}:`, err.stack || err.message);
+        console.error(`${ERROR_BANNER} Handler execution error for ${handlerName}:`, err.stack || err.message);
         return {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
@@ -631,7 +635,7 @@ const server = Bun.serve({
 
         return new Response(body, { status, headers });
       } catch (error: any) {
-        console.error(`[mockery] Request processing error:`, error);
+        console.error(`${ERROR_BANNER} Request processing error:`, error);
         return Response.json(
           { error: 'Internal server error', name: error.name, detail: error.message, stack: error.stack },
           { status: 500, headers: corsHeaders }
@@ -670,7 +674,7 @@ const server = Bun.serve({
 
         return new Response(body, { status, headers });
       } catch (error: any) {
-        console.error(`[mockery] Request processing error:`, error);
+        console.error(`${ERROR_BANNER} Request processing error:`, error);
         return Response.json(
           { error: 'Internal server error', name: error.name, detail: error.message, stack: error.stack },
           { status: 500, headers: corsHeaders }
@@ -766,9 +770,9 @@ const server = Bun.serve({
   }
 });
 
-console.log(`[mockery] Listening on http://localhost:${server.port}`);
-console.log(`[mockery] Config: ${configPath}`);
-console.log(`[mockery] Endpoints:`);
+console.log(`${LOG_BANNER} Listening on http://localhost:${server.port}`);
+console.log(`${LOG_BANNER} Config: ${configPath}`);
+console.log(`${LOG_BANNER} Endpoints:`);
 console.log(`  GET /resolve?url=<encoded>       — serve a matched mock`);
 console.log(`  GET /resolve-pattern?pattern=<>  — serve mock by pattern (for declarativeNetRequest)`);
 console.log(`  GET /rules                       — list current rules from .config/rules.ts`);
@@ -777,7 +781,7 @@ console.log(`  GET /health                      — server status`);
 
 // Graceful shutdown
 function shutdown(signal: string): void {
-  console.log(`\n[mockery] ${signal} received, shutting down…`);
+  console.log(`\n${LOG_BANNER} ${signal} received, shutting down…`);
   server.stop();
   process.exit(0);
 }
