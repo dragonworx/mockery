@@ -60,15 +60,15 @@ That's it. No `npm install`, no build step, no configuration ceremony.
 
 ## Configuration
 
-Configuration lives in the versioned `.config/` folder, separate from your mock payloads:
+Configuration lives in the versioned `config/` folder, separate from your mock payloads:
 
-- `.config/rules.ts` — rule definitions (URL patterns, file mappings, handlers)
-- `.config/rule-overrides.json` — persisted enable/disable toggle state
-- `.config/handlers/` — optional reusable handler modules
+- `config/rules.ts` — rule definitions (URL patterns, file mappings, handlers)
+- `config/rule-overrides.json` — persisted enable/disable toggle state
+- `config/handlers/` — optional reusable handler modules
 - `mocks/` — stub/mock response payloads (gitignored)
 
 ```typescript
-// .config/rules.ts
+// config/rules.ts
 import type { MockRule } from '../server/index.ts';
 
 export default [
@@ -146,7 +146,7 @@ bun --watch run server/index.ts            # Auto-restart on changes
 Handlers receive a request object and an optional original file response, then return a response object:
 
 ```typescript
-// .config/handlers/example.ts
+// config/handlers/example.ts
 import type { HandlerFunction } from '../../server/index.ts';
 
 const handler: HandlerFunction = async (request, originalResponse) => {
@@ -171,8 +171,8 @@ Handlers hot-reload automatically when saved (uses built-in `fs.watch` — no de
 
 Mockery supports live reloading without restarting anything:
 
-- **Config changes** (`.config/rules.ts`) - detected via `fs.watch`, broadcast to the extension over SSE
-- **Handler changes** (`.config/handlers/**/*.ts`) - detected via `fs.watch`, reloaded instantly
+- **Config changes** (`config/rules.ts`) - detected via `fs.watch`, broadcast to the extension over SSE
+- **Handler changes** (`config/handlers/**/*.ts`) - detected via `fs.watch`, reloaded instantly
 - **Mock file changes** - served fresh on every request (no caching)
 
 The extension popup also has a **Refresh Rules** button for manual reloads.

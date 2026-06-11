@@ -63,7 +63,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 /**
- * Update declarativeNetRequest rules based on current .config/rules.ts
+ * Update declarativeNetRequest rules based on current config/rules.ts
  */
 async function updateDeclarativeRules() {
   try {

@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@server/*": ["server/*"],
+      "@config/*": ["config/*"],
+      "@handlers/*": ["config/handlers/*"],
+      "@mocks/*": ["mocks/*"]
+    }
+  },
+  "include": ["server/**/*", "config/**/*", "mocks/**/*.ts", "scripts/**/*"]
+}

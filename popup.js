@@ -155,7 +155,7 @@ function renderRules(rules) {
   rulesList.innerHTML = '';
 
   if (rules.length === 0) {
-    rulesList.innerHTML = '<div class="empty-state">No rules in .config/rules.ts</div>';
+    rulesList.innerHTML = '<div class="empty-state">No rules in config/rules.ts</div>';
     return;
   }
 

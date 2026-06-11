@@ -1,9 +1,9 @@
 // Mockery Configuration
 // This file defines URL patterns and their corresponding mock responses
 
-import type { MockRule } from '../server/index.ts';
-import { log } from '../server/index.ts';
-import logControlIds from '../mocks/handlers/log-control-ids.ts';
+import type { MockRule } from '@server/index.ts';
+import { log } from '@server/index.ts';
+import logControlIds from '@mocks/handlers/log-control-ids.ts';
 
 export default [
   {

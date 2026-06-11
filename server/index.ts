@@ -4,11 +4,11 @@
  * Powered by Bun.
  *
  * Usage:
- *   bun run server/index.ts                    # reads .config/rules.ts from cwd
+ *   bun run server/index.ts                    # reads config/rules.ts from cwd
  *   bun run server/index.ts 9000               # custom port
  *   bun run server/index.ts --config ./my-mocks.ts   # custom config path
  *
- * Config format (.config/rules.ts):
+ * Config format (config/rules.ts):
  *   export default [
  *     { pattern: "https://api.example.com/users", file: "users.json" },
  *     { pattern: "https://api.example.com/dynamic", handler: async (req) => ({ status: 200, body: "Hi" }) },
@@ -22,7 +22,7 @@
  *   - Absolute paths are used as-is
  *
  * Handler functions:
- *   - "handler": "handlers/dynamic.ts" resolves to ".config/handlers/dynamic.ts"
+ *   - "handler": "handlers/dynamic.ts" resolves to "config/handlers/dynamic.ts"
  *   - Handlers receive (request, originalResponse) and return response object
  *   - Hot reloading via built-in fs.watch (no dependencies needed)
  *   - Can be combined with file to modify existing response
@@ -82,14 +82,14 @@ interface CachedHandler {
 const handlerCache = new Map<string, CachedHandler>();
 
 // Enable hot reload for handlers using built-in fs.watch (recursive supported on macOS/Windows)
-const handlersPath = join(process.cwd(), '.config', 'handlers');
+const handlersPath = join(process.cwd(), 'config', 'handlers');
 if (existsSync(handlersPath)) {
   try {
     watch(handlersPath, { recursive: true }, (_eventType, filename) => {
       if (!filename || !filename.endsWith('.ts')) return;
       const filePath = join(handlersPath, filename);
 
-      console.log(`${LOG_BANNER} Handler changed: .config/handlers/${filename}`);
+      console.log(`${LOG_BANNER} Handler changed: config/handlers/${filename}`);
 
       // Clear from cache
       handlerCache.delete(filePath);
@@ -103,7 +103,7 @@ if (existsSync(handlersPath)) {
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 let port = 8756;
-let configPath = join(process.cwd(), '.config', 'rules.ts');
+let configPath = join(process.cwd(), 'config', 'rules.ts');
 
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
@@ -266,8 +266,8 @@ async function loadHandler(handlerOrPath: HandlerFunction | string): Promise<Han
     return handlerOrPath;
   }
 
-  // Otherwise, treat it as a file path (relative to .config/)
-  const fullPath = resolve('.config', handlerOrPath);
+  // Otherwise, treat it as a file path (relative to config/)
+  const fullPath = resolve('config', handlerOrPath);
 
   try {
     // Check if handler is cached and file hasn't changed
@@ -880,7 +880,7 @@ console.log(`${LOG_BANNER} Config: ${configPath}`);
 console.log(`${LOG_BANNER} Endpoints:`);
 console.log(`  GET /resolve?url=<encoded>       — serve a matched mock`);
 console.log(`  GET /resolve-pattern?pattern=<>  — serve mock by pattern (for declarativeNetRequest)`);
-console.log(`  GET /rules                       — list current rules from .config/rules.ts`);
+console.log(`  GET /rules                       — list current rules from config/rules.ts`);
 console.log(`  GET /events                      — SSE stream for hot reload`);
 console.log(`  GET /health                      — server status`);
 
