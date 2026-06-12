@@ -9,12 +9,11 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "baseUrl": ".",
     "paths": {
-      "@server/*": ["server/*"],
-      "@config/*": ["config/*"],
-      "@handlers/*": ["config/handlers/*"],
-      "@mocks/*": ["mocks/*"]
+      "@server/*": ["./server/*"],
+      "@config/*": ["./config/*"],
+      "@handlers/*": ["./config/handlers/*"],
+      "@mocks/*": ["./mocks/*"]
     }
   },
   "include": ["server/**/*", "config/**/*", "mocks/**/*.ts", "scripts/**/*"]
