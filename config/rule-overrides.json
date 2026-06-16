@@ -1,3 +1,4 @@
 {
-  "GET:/address-book\\.smtnbnxt\\.json($|\\?)": true
+  "GET:/address-book\\.smtnbnxt\\.json($|\\?)": true,
+  "POST:^https://edge\\.adobedc\\.net/ee/aus3/v1/interact": true
 }

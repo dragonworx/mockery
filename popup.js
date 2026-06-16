@@ -15,6 +15,7 @@ const rulesList = document.getElementById('rulesList');
 const activityList = document.getElementById('activityList');
 const clearActivityBtn = document.getElementById('clearActivityBtn');
 const notifyToggle = document.getElementById('notifyToggle');
+const autoDismissToggle = document.getElementById('autoDismissToggle');
 const logLevelSelect = document.getElementById('logLevel');
 const toastDurationInput = document.getElementById('toastDuration');
 
@@ -26,8 +27,8 @@ const DEFAULT_TOAST_DURATION = 10;
 
 // ── Init ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  const { enabled, serverUrl, showNotifications, enableLogging, logLevel, toastDuration } = await chrome.storage.local.get([
-    'enabled', 'serverUrl', 'showNotifications', 'enableLogging', 'logLevel', 'toastDuration'
+  const { enabled, serverUrl, showNotifications, enableLogging, logLevel, toastDuration, autoDismissToasts } = await chrome.storage.local.get([
+    'enabled', 'serverUrl', 'showNotifications', 'enableLogging', 'logLevel', 'toastDuration', 'autoDismissToasts'
   ]);
 
   enableToggle.checked = enabled !== false;
@@ -46,12 +47,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   logLevelSelect.value = resolvedLevel;
   toastDurationInput.value = clampDuration(toastDuration);
+  autoDismissToggle.checked = autoDismissToasts !== false; // Default to true
+  updateToastDurationDisabled();
 
   enableToggle.addEventListener('change', handleToggle);
   connectBtn.addEventListener('click', handleConnect);
   refreshBtn.addEventListener('click', fetchRules);
   clearActivityBtn.addEventListener('click', handleClearActivity);
   notifyToggle.addEventListener('change', handleNotifyToggle);
+  autoDismissToggle.addEventListener('change', handleAutoDismissToggle);
   logLevelSelect.addEventListener('change', handleLogLevelChange);
   toastDurationInput.addEventListener('change', handleToastDurationChange);
   toastDurationInput.addEventListener('blur', handleToastDurationChange);
@@ -77,6 +81,16 @@ function updateStatusText(enabled) {
 async function handleNotifyToggle() {
   const showNotifications = notifyToggle.checked;
   await chrome.storage.local.set({ showNotifications });
+}
+
+async function handleAutoDismissToggle() {
+  const autoDismissToasts = autoDismissToggle.checked;
+  await chrome.storage.local.set({ autoDismissToasts });
+  updateToastDurationDisabled();
+}
+
+function updateToastDurationDisabled() {
+  toastDurationInput.disabled = !autoDismissToggle.checked;
 }
 
 async function handleLogLevelChange() {

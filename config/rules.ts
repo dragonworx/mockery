@@ -26,6 +26,12 @@ export default [
         const controlType = cba?.trackingDetails?.controlType;
         const bladeName = cba?.page?.bladeName;
 
+        if (controlId) {
+          log.info(`🎯 Control triggered: "${controlId}"`);
+        } else {
+          log.warn('🎯 Control triggered: <no control id found in payload>');
+        }
+
         if (interactionName || controlType || bladeName) {
           log.info(`"${controlId}"\n`, { interactionName, controlType, blade: bladeName });
         }

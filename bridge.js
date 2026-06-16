@@ -12,6 +12,7 @@
 const CHANNEL = '__MOCKERY__';
 const DEFAULT_TOAST_DURATION_MS = 10000;
 let toastDurationMs = DEFAULT_TOAST_DURATION_MS;
+let autoDismissToasts = true;
 
 // ── Log banners ────────────────────────────────────────────────────────────────────────
 const LOG_BANNER = '✅';
@@ -51,6 +52,7 @@ function applyToastDuration(value) {
 }
 
 chrome.storage.local.get('toastDuration').then(({ toastDuration }) => applyToastDuration(toastDuration));
+chrome.storage.local.get('autoDismissToasts').then(({ autoDismissToasts: v }) => { autoDismissToasts = v !== false; });
 
 // ── Push rules into MAIN world ──────────────────────────────────────────────
 
@@ -94,6 +96,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (area === 'local' && changes.toastDuration) {
     applyToastDuration(changes.toastDuration.newValue);
+  }
+  if (area === 'local' && changes.autoDismissToasts) {
+    autoDismissToasts = changes.autoDismissToasts.newValue !== false;
   }
 });
 
@@ -630,7 +635,9 @@ function showToast(url, file, type = 'success', errorInfoOrMessage = null, encod
 
   // Error toasts persist longer so the user has time to read the stack
   const duration = isError ? Math.max(toastDurationMs, 30_000) : toastDurationMs;
-  toast.__timer = setTimeout(() => dismissToast(toast), duration);
+  if (autoDismissToasts) {
+    toast.__timer = setTimeout(() => dismissToast(toast), duration);
+  }
 }
 
 log('debug', 'ISOLATED bridge loaded');
