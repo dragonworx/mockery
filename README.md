@@ -106,14 +106,16 @@ export default [
 
 ### Rule Options
 
-| Field       | Type                 | Description                                               |
-|-------------|----------------------|-----------------------------------------------------------|
-| `pattern`   | `string`             | URL to match (exact, substring, or regex)                 |
-| `file`      | `string`             | Path to mock file, relative to `mocks/`                  |
-| `handler`   | `function \| string` | Dynamic response generator `(request, originalResponse) => response` |
-| `isRegex`   | `boolean`            | Treat `pattern` as a regular expression                   |
-| `method`    | `string`             | HTTP method filter (`GET`, `POST`, etc.) - defaults to `*` |
-| `enabled`   | `boolean`            | Set `false` to skip this rule                             |
+| Field            | Type                 | Description                                               |
+|------------------|----------------------|-----------------------------------------------------------|
+| `pattern`        | `string`             | URL to match (exact, substring, or regex)                 |
+| `file`           | `string`             | Path to mock response file, relative to `mocks/`          |
+| `requestFile`    | `string`             | Path to request template file, relative to `mocks/`       |
+| `forwardRequest` | `boolean`            | Forward (modified) request to real server                 |
+| `handler`        | `function \| string` | Dynamic response generator `(request, responseTemplate, requestTemplate) => response` |
+| `isRegex`        | `boolean`            | Treat `pattern` as a regular expression                   |
+| `method`         | `string`             | HTTP method filter (`GET`, `POST`, etc.) - defaults to `*` |
+| `enabled`        | `boolean`            | Set `false` to skip this rule                             |
 
 ---
 
@@ -143,15 +145,16 @@ bun --watch run server/index.ts            # Auto-restart on changes
 
 ## Handler Functions
 
-Handlers receive a request object and an optional original file response, then return a response object:
+Handlers receive a request object, an optional response template, and an optional request template:
 
 ```typescript
 // config/handlers/example.ts
 import type { HandlerFunction } from '../../server/index.ts';
 
-const handler: HandlerFunction = async (request, originalResponse) => {
+const handler: HandlerFunction = async (request, responseTemplate, requestTemplate) => {
   // request: { url, method, headers, body, query, timestamp }
-  // originalResponse: { status, headers, body } (if file is also specified)
+  // responseTemplate: { status, headers, body } (if file is specified)
+  // requestTemplate: object (if requestFile is specified)
 
   return {
     status: 200,
@@ -164,6 +167,150 @@ export default handler;
 ```
 
 Handlers hot-reload automatically when saved (uses built-in `fs.watch` — no dependencies needed).
+
+---
+
+## Request & Response Interception
+
+Mockery supports full request/response lifecycle interception with two powerful options:
+
+### Option A: Request Templates (requestFile)
+
+Load request templates from the `mocks/` folder to compare, validate, or use as the outgoing request body:
+
+```typescript
+{
+  pattern: "https://api.example.com/transfer",
+  method: "POST",
+  requestFile: "requests/transfer-payload.json",  // Loaded as requestTemplate
+  file: "responses/transfer-success.json",        // Loaded as responseTemplate
+  handler: async (request, responseTemplate, requestTemplate) => {
+    // Compare actual request vs expected template
+    console.log('Expected:', requestTemplate);
+    console.log('Actual:', JSON.parse(request.body));
+    
+    // Return the mock response
+    return responseTemplate;
+  }
+}
+```
+
+### Option B: Forward Modified Requests (forwardRequest)
+
+Modify the request and forward it to the real server, then optionally transform the response:
+
+```typescript
+{
+  pattern: "https://api.example.com/users",
+  method: "POST",
+  forwardRequest: true,  // Send modified request to real server
+  handler: async (request) => ({
+    request: {
+      ...request,
+      headers: { ...request.headers, 'X-Debug': 'true' },
+      body: JSON.stringify({
+        ...JSON.parse(request.body || '{}'),
+        timestamp: new Date().toISOString()
+      })
+    }
+    // No response = use real server response
+  })
+}
+```
+
+### Combined: Templates + Forwarding
+
+Use local templates AND forward to real server:
+
+```typescript
+{
+  pattern: "https://api.example.com/transfer",
+  method: "POST",
+  requestFile: "requests/transfer.json",  // Use as request body
+  forwardRequest: true,
+  handler: async (request, _, requestTemplate) => ({
+    request: {
+      ...request,
+      body: JSON.stringify(requestTemplate)  // Replace body with template
+    }
+  })
+}
+```
+
+### Request Interception Flow
+
+```
+fetch(url, init) called
+         │
+         ▼
+    Match rule?
+    ┌────┴────┐
+   No         Yes
+    │          │
+    ▼          ▼
+ Original   Load requestFile? ──Yes──▶ Load from mocks/
+  fetch()      │                              │
+               ▼                              │
+           Load file? ──Yes──▶ Load response  │
+               │               template       │
+               ▼                    │         │
+         Call handler(request, responseTemplate, requestTemplate)
+               │
+               ▼
+        Handler returns
+        ┌──────┴──────┐
+    { response }    { request, response? }
+        │                    │
+        ▼                    ▼
+  Return mock        forwardRequest: true?
+   response          ┌────────┴────────┐
+                    No                 Yes
+                     │                  │
+                     ▼                  ▼
+               Return mock        Send modified
+               response           request to server
+                                       │
+                                       ▼
+                                 Get real response
+                                       │
+                                       ▼
+                              response.transform?
+                              ┌────────┴────────┐
+                             No                Yes
+                              │                 │
+                              ▼                 ▼
+                         Return real      Transform & return
+                         response         modified response
+```
+
+### Handler Return Types
+
+Handlers can return either a direct response or a request/response combination:
+
+```typescript
+// Direct response (existing behavior)
+return {
+  status: 200,
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ data: 'mocked' })
+};
+
+// Request modification (new)
+return {
+  request: {
+    url: 'https://api.example.com/v2/users',  // Optional URL override
+    method: 'POST',                            // Optional method override
+    headers: { 'Authorization': 'Bearer xxx' },
+    body: JSON.stringify({ modified: true })
+  },
+  response: {  // Optional response transform
+    status: 200,
+    headers: {},
+    body: JSON.stringify({ _mockeryModified: true })
+  },
+  skipForward: false  // Set true to skip forwarding even if forwardRequest is set
+};
+```
 
 ---
 

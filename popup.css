@@ -281,6 +281,38 @@ body {
 .rule-badge.regex { background: #e3f2fd; color: #1976d2; }
 .rule-badge.exact { background: #e8f5e8; color: #2e7d32; }
 
+/* Permission badge */
+.permission-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.permission-badge.granted { background: #e8f5e8; color: #2e7d32; }
+.permission-badge.not-granted { background: #fff3e0; color: #e65100; }
+.permission-badge.error { background: #ffebee; color: #c62828; }
+
+.permissions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.permission-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.permission-hint {
+  display: block;
+  margin-top: 4px;
+  color: #888;
+  font-size: 11px;
+}
+
 /* Per-rule toggle switch */
 .rule-toggle-wrap {
   position: relative;

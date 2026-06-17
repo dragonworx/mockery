@@ -298,6 +298,123 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       const mime = resp.headers.get('content-type') || 'application/json';
+      
+      // Check if this is a forward request instruction
+      if (mime.includes('application/json')) {
+        const jsonBody = await resp.text();
+        try {
+          const parsed = JSON.parse(jsonBody);
+          
+          if (parsed.forward === true) {
+            const forwardUrl = parsed.modifiedRequest?.url || parsed.forwardUrl || message.url;
+            
+            // Check if we have permission to forward to this URL
+            // Skip check for localhost which is always allowed
+            const forwardOrigin = new URL(forwardUrl).origin;
+            const isLocalhost = forwardOrigin.includes('localhost') || forwardOrigin.includes('127.0.0.1');
+            
+            if (!isLocalhost) {
+              const hasPermission = await chrome.permissions.contains({
+                origins: ['<all_urls>']
+              }).catch(() => false);
+              
+              if (!hasPermission) {
+                log('warn', 'Missing permission to forward to:', forwardUrl);
+                sendResponse({ 
+                  error: 'Permission required to forward requests to external servers. Grant "All URLs" permission in extension settings (chrome://extensions > Mockery > Details > Site access).',
+                  permissionRequired: true,
+                  forwardUrl
+                });
+                return;
+              }
+            }
+            
+            // Forward the (modified) request to the real server
+            log('debug', 'Forwarding modified request to:', forwardUrl);
+            
+            const modReq = parsed.modifiedRequest || {};
+            const forwardMethod = modReq.method || method;
+            const forwardHeaders = modReq.headers || {};
+            const forwardBody = modReq.body !== undefined ? modReq.body : message.body;
+            
+            const forwardInit = {
+              method: forwardMethod,
+              headers: forwardHeaders,
+            };
+            
+            // Add body for non-GET/HEAD requests
+            if (forwardBody && !['GET', 'HEAD'].includes(forwardMethod)) {
+              forwardInit.body = forwardBody;
+            }
+            
+            try {
+              const realResp = await fetch(forwardUrl, forwardInit);
+              let realBody = await realResp.text();
+              const realMime = realResp.headers.get('content-type') || 'application/json';
+              
+              // Apply response transform if specified
+              if (parsed.responseTransform) {
+                log('debug', 'Applying response transform');
+                const transform = parsed.responseTransform;
+                
+                // If transform has a body, use it as template/merge
+                if (transform.body) {
+                  try {
+                    // Try to merge JSON responses
+                    const realJson = JSON.parse(realBody);
+                    const transformJson = JSON.parse(transform.body);
+                    realBody = JSON.stringify({ ...realJson, ...transformJson });
+                  } catch {
+                    // If not JSON, use transform body directly
+                    realBody = transform.body;
+                  }
+                }
+              }
+              
+              // Log activity as forwarded
+              const activity = {
+                url: message.url,
+                forwardedTo: forwardUrl,
+                method: forwardMethod,
+                mime: realMime,
+                timestamp: new Date().toISOString(),
+                forwarded: true,
+              };
+              const { recentActivity = [] } = await chrome.storage.local.get('recentActivity');
+              recentActivity.unshift(activity);
+              await chrome.storage.local.set({
+                recentActivity: recentActivity.slice(0, 20),
+              });
+              
+              sendResponse({ 
+                body: realBody, 
+                mime: realMime, 
+                isBinary: false,
+                forwarded: true,
+                forwardedTo: forwardUrl
+              });
+              return;
+            } catch (forwardErr) {
+              log('error', 'Error forwarding request:', forwardErr);
+              sendResponse({ error: `Forward request failed: ${forwardErr.message}` });
+              return;
+            }
+          }
+          
+          // Not a forward response - return the JSON as the mock body
+          sendResponse({ 
+            body: jsonBody, 
+            mime, 
+            isBinary: false,
+            handlerLogs: resp.headers.get('x-mockery-logs') || null,
+            mockeryMatch: resp.headers.get('x-mockery-match') || null
+          });
+          return;
+        } catch {
+          // Not valid JSON - fall through to normal handling
+        }
+      }
+
       const handlerLogs = resp.headers.get('x-mockery-logs') || null;
       const mockeryMatch = resp.headers.get('x-mockery-match') || null;
 

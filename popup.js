@@ -18,6 +18,8 @@ const notifyToggle = document.getElementById('notifyToggle');
 const autoDismissToggle = document.getElementById('autoDismissToggle');
 const logLevelSelect = document.getElementById('logLevel');
 const toastDurationInput = document.getElementById('toastDuration');
+const forwardPermissionStatus = document.getElementById('forwardPermissionStatus');
+const grantForwardPermission = document.getElementById('grantForwardPermission');
 
 const LOG_LEVELS = new Set(['silent', 'error', 'warn', 'info', 'debug']);
 const DEFAULT_LOG_LEVEL = 'info';
@@ -59,9 +61,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   logLevelSelect.addEventListener('change', handleLogLevelChange);
   toastDurationInput.addEventListener('change', handleToastDurationChange);
   toastDurationInput.addEventListener('blur', handleToastDurationChange);
+  grantForwardPermission.addEventListener('click', handleGrantForwardPermission);
 
   await checkServer();
   await loadActivity();
+  await checkForwardPermission();
 });
 
 // ── Enable / Disable ────────────────────────────────────────────────────────
@@ -97,6 +101,46 @@ async function handleLogLevelChange() {
   const value = logLevelSelect.value;
   const logLevel = LOG_LEVELS.has(value) ? value : DEFAULT_LOG_LEVEL;
   await chrome.storage.local.set({ logLevel });
+}
+
+// ── Forward Permission ────────────────────────────────────────────────────────
+async function checkForwardPermission() {
+  try {
+    const hasPermission = await chrome.permissions.contains({
+      origins: ['<all_urls>']
+    });
+    
+    if (hasPermission) {
+      forwardPermissionStatus.textContent = 'Granted';
+      forwardPermissionStatus.className = 'permission-badge granted';
+      grantForwardPermission.style.display = 'none';
+    } else {
+      forwardPermissionStatus.textContent = 'Not granted';
+      forwardPermissionStatus.className = 'permission-badge not-granted';
+      grantForwardPermission.style.display = 'inline-block';
+    }
+  } catch (err) {
+    forwardPermissionStatus.textContent = 'Error';
+    forwardPermissionStatus.className = 'permission-badge error';
+  }
+}
+
+async function handleGrantForwardPermission() {
+  try {
+    const granted = await chrome.permissions.request({
+      origins: ['<all_urls>']
+    });
+    
+    if (granted) {
+      showNotification('Permission granted', 'success');
+    } else {
+      showNotification('Permission denied', 'error');
+    }
+    
+    await checkForwardPermission();
+  } catch (err) {
+    showNotification('Failed to request permission', 'error');
+  }
 }
 
 function clampDuration(value) {

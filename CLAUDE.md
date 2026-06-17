@@ -181,9 +181,11 @@ Handler functions allow dynamic response generation and modification with three 
 - **Inline Functions**: Define handlers directly in `rules.ts`
 - **Imported Modules**: Import handlers using `import` (ESM)
 - **File Path Strings**: Reference handler files by path (resolved at runtime, relative to `config/`)
-- **Function signature**: `async (request, originalResponse) => responseObject`
+- **Function signature**: `async (request, responseTemplate, requestTemplate) => responseObject | handlerResult`
 - **Hot reload**: Configuration and handler files reload automatically
 - **Combination**: Can be used with `file` to modify existing responses
+- **Request templates**: Use `requestFile` to load a request template for comparison or forwarding
+- **Request forwarding**: Set `forwardRequest: true` to send modified requests to real servers
 - **Type safety**: Import `HandlerFunction` type for full autocomplete
 
 **Inline Handler Example:**
@@ -223,9 +225,29 @@ export default [
 import type { HandlerFunction } from '../../server/index.ts';
 import { success } from './utils/common-responses.ts';
 
-const handler: HandlerFunction = async (request, originalResponse) => {
+const handler: HandlerFunction = async (request, responseTemplate, requestTemplate) => {
   return success({ message: 'Hello', url: request.url });
 };
+
+export default handler;
+```
+
+**Request Forwarding Example** (`config/handlers/forward-modified.ts`):
+```typescript
+import type { HandlerFunction } from '../../server/index.ts';
+
+// Modify request headers and forward to real server
+const handler: HandlerFunction = async (request) => ({
+  request: {
+    ...request,
+    headers: { ...request.headers, 'X-Debug': 'true' },
+    body: JSON.stringify({
+      ...JSON.parse(request.body || '{}'),
+      timestamp: new Date().toISOString()
+    })
+  }
+  // No response = use real server response
+});
 
 export default handler;
 ```
@@ -383,12 +405,13 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 
 ### Extension Permissions
 - `storage` — for persisting enabled state and server URL
-- `host_permissions: ["http://localhost/*"]` — for communicating with Bun server
 - `declarativeNetRequest` — for intercepting HTML resource requests
+- `host_permissions: ["http://localhost/*"]` — for communicating with Bun server
+- `optional_host_permissions: ["<all_urls>"]` — only needed for `forwardRequest: true` rules (request forwarding to external servers)
 
 ### Security Considerations
 - Extension only communicates with localhost by default
-- No external network requests from extension
+- No external network requests unless `forwardRequest` is enabled AND optional permission is granted
 - Mock files are served from local filesystem only
 - HTML escaping in popup UI to prevent XSS
 

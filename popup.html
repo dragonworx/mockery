@@ -88,6 +88,14 @@
             <span class="spinner-suffix">s</span>
           </div>
         </div>
+        <div class="setting-row permissions-row">
+          <label>Request forwarding</label>
+          <div class="permission-status">
+            <span id="forwardPermissionStatus" class="permission-badge">Checking...</span>
+            <button type="button" id="grantForwardPermission" class="btn btn-small btn-primary" style="display: none;">Grant</button>
+          </div>
+        </div>
+        <small class="permission-hint">Required for <code>forwardRequest: true</code> rules that send requests to external servers.</small>
       </details>
     </div>
 

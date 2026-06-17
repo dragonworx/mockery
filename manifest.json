@@ -5,11 +5,12 @@
   "description": "Intercept HTTP requests and return mock responses from a local Node.js companion server",
   "permissions": [
     "storage",
-    "declarativeNetRequest",
-    "tabs"
+    "declarativeNetRequest"
   ],
   "host_permissions": [
-    "http://localhost/*",
+    "http://localhost/*"
+  ],
+  "optional_host_permissions": [
     "<all_urls>"
   ],
   "background": {

@@ -41,6 +41,8 @@ const ERROR_BANNER = '❌';
 export interface MockRule {
   pattern: string;
   file?: string;
+  requestFile?: string;        // Load request template from mocks/ folder
+  forwardRequest?: boolean;    // Forward (modified) request to real server
   isRegex?: boolean;
   method?: string;
   enabled?: boolean;
@@ -63,7 +65,27 @@ export interface HandlerResponse {
   body: string | Buffer;
 }
 
-export type HandlerFunction = (request: HandlerRequest, originalResponse: HandlerResponse | null) => Promise<HandlerResponse>;
+/** Modified request to forward to real server (Option B) */
+export interface ModifiedRequest {
+  url?: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string | null;
+}
+
+/** Handler can return just a response OR a request modification + optional response transform */
+export interface HandlerResult {
+  request?: ModifiedRequest;           // Modified request to forward
+  response?: HandlerResponse;          // Mock response OR response transform config
+  skipForward?: boolean;               // If true, don't forward even if forwardRequest is set
+}
+
+/** Handler function signature - can return a response directly or a HandlerResult for request modification */
+export type HandlerFunction = (
+  request: HandlerRequest,
+  responseTemplate: HandlerResponse | null,
+  requestTemplate: object | null
+) => Promise<HandlerResponse | HandlerResult>;
 
 export interface MatchInfo {
   start: number;
@@ -397,6 +419,19 @@ async function withHandlerContext<T>(handlerName: string, fn: () => Promise<T>):
   return { result, logs: ctx.logs };
 }
 
+/** Result from resolving a rule - can be a direct response or request modification instructions */
+export interface ResolveResult {
+  type: 'response' | 'forward';
+  response?: HandlerResponse;
+  modifiedRequest?: ModifiedRequest;
+  forwardUrl?: string;
+}
+
+/** Check if result is a HandlerResult (has request or response keys) vs direct HandlerResponse */
+function isHandlerResult(result: HandlerResponse | HandlerResult): result is HandlerResult {
+  return 'request' in result || ('response' in result && !('status' in result));
+}
+
 async function resolveWithHandler(
   targetUrl: string,
   rule: MockRule,
@@ -404,20 +439,21 @@ async function resolveWithHandler(
   targetMethod: string,
   body: string | null = null,
   match: MatchInfo | null = null
-): Promise<HandlerResponse | null> {
-  let originalResponse: HandlerResponse | null = null;
+): Promise<ResolveResult | null> {
+  let responseTemplate: HandlerResponse | null = null;
+  let requestTemplate: object | null = null;
 
   const matchHeader: Record<string, string> = match
     ? { 'X-Mockery-Match': encodeMockeryMatch(match) }
     : {};
 
-  // Load file response if specified
+  // Load response file template if specified
   if (rule.file) {
     const filePath = resolveFilePath(rule.file);
     if (existsSync(filePath)) {
       try {
         const content = readFileSync(filePath);
-        originalResponse = {
+        responseTemplate = {
           status: 200,
           headers: { 'Content-Type': guessMime(filePath) },
           body: content.toString()
@@ -425,9 +461,38 @@ async function resolveWithHandler(
       } catch (err: any) {
         console.error(`${ERROR_BANNER} Error reading file ${filePath}:`, err.message);
         return {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: 'File read error', file: rule.file, detail: err.message })
+          type: 'response',
+          response: {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'File read error', file: rule.file, detail: err.message })
+          }
+        };
+      }
+    }
+  }
+
+  // Load request template if specified (Option C)
+  if (rule.requestFile) {
+    const filePath = resolveFilePath(rule.requestFile);
+    if (existsSync(filePath)) {
+      try {
+        const content = readFileSync(filePath, 'utf-8');
+        // Try to parse as JSON, fallback to raw string
+        try {
+          requestTemplate = JSON.parse(content);
+        } catch {
+          requestTemplate = { raw: content };
+        }
+      } catch (err: any) {
+        console.error(`${ERROR_BANNER} Error reading request file ${filePath}:`, err.message);
+        return {
+          type: 'response',
+          response: {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Request file read error', file: rule.requestFile, detail: err.message })
+          }
         };
       }
     }
@@ -440,54 +505,120 @@ async function resolveWithHandler(
       const handlerName = typeof rule.handler === 'function' ? 'inline function' : rule.handler;
       try {
         const requestObj = buildRequestObject(req, targetUrl, targetMethod, body);
-        const { result, logs } = await withHandlerContext(handlerName, () => handler(requestObj, originalResponse));
+        const { result, logs } = await withHandlerContext(handlerName, () => handler(requestObj, responseTemplate, requestTemplate));
 
         // Validate handler response
         if (!result || typeof result !== 'object') {
-          throw new Error('Handler must return a response object');
+          throw new Error('Handler must return a response object or HandlerResult');
         }
 
-        // Attach captured logs as a custom header so the browser can replay them.
-        const merged: HandlerResponse = {
-          ...result,
-          headers: {
-            ...(result.headers || {}),
-            ...matchHeader,
-            ...(logs.length ? { 'X-Mockery-Logs': encodeMockeryLogs(logs, handlerName) } : {}),
-          },
+        const logsHeader = logs.length ? { 'X-Mockery-Logs': encodeMockeryLogs(logs, handlerName) } : {};
+
+        // Check if result is a HandlerResult (request modification) or direct response
+        if (isHandlerResult(result)) {
+          // Handler returned { request?, response?, skipForward? }
+          const handlerResult = result as HandlerResult;
+
+          // If handler wants to forward request (Option B)
+          if (handlerResult.request && rule.forwardRequest && !handlerResult.skipForward) {
+            return {
+              type: 'forward',
+              modifiedRequest: handlerResult.request,
+              forwardUrl: handlerResult.request.url || targetUrl,
+              response: handlerResult.response ? {
+                ...handlerResult.response,
+                headers: { ...handlerResult.response.headers, ...matchHeader, ...logsHeader }
+              } : undefined
+            };
+          }
+
+          // Handler returned a response (or we're not forwarding)
+          if (handlerResult.response) {
+            return {
+              type: 'response',
+              response: {
+                ...handlerResult.response,
+                headers: { ...handlerResult.response.headers, ...matchHeader, ...logsHeader }
+              }
+            };
+          }
+
+          // Handler only modified request but forwardRequest is false - use response template
+          if (responseTemplate) {
+            return {
+              type: 'response',
+              response: {
+                ...responseTemplate,
+                headers: { ...responseTemplate.headers, ...matchHeader, ...logsHeader }
+              }
+            };
+          }
+
+          throw new Error('Handler returned request modification but no response and forwardRequest is not enabled');
+        }
+
+        // Direct HandlerResponse
+        const directResponse = result as HandlerResponse;
+        return {
+          type: 'response',
+          response: {
+            ...directResponse,
+            headers: { ...directResponse.headers, ...matchHeader, ...logsHeader }
+          }
         };
-        return merged;
       } catch (err: any) {
         console.error(`${ERROR_BANNER} Handler execution error for ${handlerName}:`, err.stack || err.message);
         return {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            error: 'Handler execution error',
-            handler: handlerName,
-            detail: err.message,
-            name: err.name,
-            stack: err.stack,
-          })
+          type: 'response',
+          response: {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              error: 'Handler execution error',
+              handler: handlerName,
+              detail: err.message,
+              name: err.name,
+              stack: err.stack,
+            })
+          }
         };
       }
     } else {
       const handlerName = typeof rule.handler === 'function' ? 'inline function' : rule.handler;
       return {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Failed to load handler', handler: handlerName })
+        type: 'response',
+        response: {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: 'Failed to load handler', handler: handlerName })
+        }
       };
     }
   }
 
-  if (originalResponse) {
+  // No handler - return response template if available
+  if (responseTemplate) {
     return {
-      ...originalResponse,
-      headers: { ...originalResponse.headers, ...matchHeader },
+      type: 'response',
+      response: {
+        ...responseTemplate,
+        headers: { ...responseTemplate.headers, ...matchHeader }
+      }
     };
   }
-  return originalResponse;
+
+  // No handler and no file - check if forwardRequest is enabled with requestTemplate
+  if (rule.forwardRequest && requestTemplate) {
+    return {
+      type: 'forward',
+      modifiedRequest: {
+        body: typeof requestTemplate === 'object' ? JSON.stringify(requestTemplate) : String(requestTemplate)
+      },
+      forwardUrl: targetUrl
+    };
+  }
+
+  return null;
 }
 
 // Encode captured logs for transport over an HTTP header.
@@ -720,11 +851,32 @@ const server = Bun.serve({
           );
         }
 
+        // Handle forward request mode (Option B)
+        if (result.type === 'forward') {
+          logMockServed(targetMethod || req.method, targetUrl, rule, match);
+          console.log(`${LOG_BANNER} → Forwarding modified request to ${result.forwardUrl}`);
+          
+          // Return forward instructions to the extension
+          return Response.json({
+            forward: true,
+            forwardUrl: result.forwardUrl,
+            modifiedRequest: result.modifiedRequest,
+            // Include response transform if handler specified one
+            responseTransform: result.response ? {
+              status: result.response.status,
+              headers: result.response.headers,
+              body: typeof result.response.body === 'string' ? result.response.body : result.response.body.toString()
+            } : null
+          }, { headers: corsHeaders });
+        }
+
+        // Standard response mode
         logMockServed(targetMethod || req.method, targetUrl, rule, match);
 
-        const status = result.status || 200;
-        const headers = { ...corsHeaders, ...result.headers };
-        const body = result.body || '';
+        const response = result.response!;
+        const status = response.status || 200;
+        const headers = { ...corsHeaders, ...response.headers };
+        const body = response.body || '';
 
         return new Response(body, { status, headers });
       } catch (error: any) {
@@ -773,9 +925,18 @@ const server = Bun.serve({
 
         logMockServed('GET', pattern, rule, match);
 
-        const status = result.status || 200;
-        const headers = { ...corsHeaders, ...result.headers };
-        const body = result.body || '';
+        // Pattern-based resolution doesn't support forwarding (it's for static resources)
+        if (result.type === 'forward') {
+          return Response.json(
+            { error: 'Forward request not supported for pattern-based resolution', pattern },
+            { status: 400, headers: corsHeaders }
+          );
+        }
+
+        const response = result.response!;
+        const status = response.status || 200;
+        const headers = { ...corsHeaders, ...response.headers };
+        const body = response.body || '';
 
         return new Response(body, { status, headers });
       } catch (error: any) {
@@ -819,6 +980,8 @@ const server = Bun.serve({
       const serialized = rules.map(r => ({
         pattern: r.pattern,
         file: r.file || null,
+        requestFile: r.requestFile || null,
+        forwardRequest: r.forwardRequest || false,
         isRegex: r.isRegex || false,
         method: r.method || '*',
         enabled: r.enabled !== false,
