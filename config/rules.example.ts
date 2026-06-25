@@ -10,11 +10,11 @@
 // (If config/rules.ts is missing, the server seeds a minimal one on startup.)
 //
 // Quick reference (see README.md "Cookbook" for the full list):
-//   pattern        URL to match — substring by default, regex when isRegex: true
+//   pattern        URL to match. A string matches literally (exact URL or a
+//                  substring of it); a RegExp (e.g. /\/users\/\d+$/) is a regex.
 //   file           mock file to serve, relative to mocks/
 //   handler        function to generate/modify a response (inline or imported)
 //   method         restrict to an HTTP method (GET, POST, …)
-//   isRegex        treat `pattern` as a regular expression
 //   enabled        set false to disable a rule without deleting it
 //   forwardRequest forward the (modified) request to the real server
 
@@ -27,10 +27,9 @@ export default [
     file: "users.json", // → mocks/users.json
   },
 
-  // ── Match with a regex and filter by method ─────────────────────────────────
+  // ── Match with a regex (use a RegExp literal) and filter by method ──────────
   {
-    pattern: "/users/\\d+$",
-    isRegex: true,
+    pattern: /\/users\/\d+$/,
     method: "GET",
     file: "user.json",
   },

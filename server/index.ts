@@ -12,7 +12,7 @@
  *   export default [
  *     { pattern: "https://api.example.com/users", file: "users.json" },
  *     { pattern: "https://api.example.com/dynamic", handler: async (req) => ({ status: 200, body: "Hi" }) },
- *     { pattern: "address-book\\.smtnbnxt\\.json", file: "icon.svg", isRegex: true }
+ *     { pattern: /\/users\/\d+$/, file: "user.json" }   // RegExp = regex match
  *   ];
  *
  * File paths:
@@ -44,15 +44,39 @@ const DEBUG = process.env.MOCKERY_DEBUG === '1' || process.env.MOCKERY_DEBUG ===
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface MockRule {
-  pattern: string;
+  /**
+   * URL to match.
+   *   - A **string** is a literal match (exact URL, or substring of the URL).
+   *   - A **RegExp** (e.g. `/\/users\/\d+$/`) is matched as a regular expression.
+   * The type decides the matching mode — no flag needed.
+   */
+  pattern: string | RegExp;
   file?: string;
   requestFile?: string;        // Load request template from mocks/ folder
   forwardRequest?: boolean;    // Forward (modified) request to real server
+  /** @deprecated Use a RegExp literal for `pattern` instead. Still honored for string patterns. */
   isRegex?: boolean;
   method?: string;
   enabled?: boolean;
   handler?: HandlerFunction | string;
   comment?: string;
+}
+
+/** True if the rule should be matched as a regex (RegExp pattern, or legacy isRegex flag). */
+function isRegexRule(rule: MockRule): boolean {
+  return rule.pattern instanceof RegExp || rule.isRegex === true;
+}
+
+/** The pattern as a plain string (RegExp source), for logging, keys, and the wire format. */
+function patternString(rule: MockRule): string {
+  return rule.pattern instanceof RegExp ? rule.pattern.source : rule.pattern;
+}
+
+/** Compile a fresh RegExp for the rule (fresh each call so lastIndex never carries over). */
+function compileRegex(rule: MockRule): RegExp {
+  return rule.pattern instanceof RegExp
+    ? new RegExp(rule.pattern.source, rule.pattern.flags)
+    : new RegExp(rule.pattern as string);
 }
 
 export interface HandlerRequest {
@@ -147,7 +171,7 @@ for (let i = 2; i < process.argv.length; i++) {
 const overridesPath = join(dirname(configPath), 'rule-overrides.json');
 
 function ruleKey(rule: MockRule): string {
-  return `${(rule.method || '*').toUpperCase()}:${rule.pattern}`;
+  return `${(rule.method || '*').toUpperCase()}:${patternString(rule)}`;
 }
 
 function loadOverrides(): Record<string, boolean> {
@@ -254,11 +278,11 @@ async function loadConfig(): Promise<void> {
     // Validate regex patterns once, up front, so a typo surfaces as a clear
     // warning instead of silently never matching at request time.
     for (const rule of rules) {
-      if (rule.isRegex) {
+      if (isRegexRule(rule)) {
         try {
-          new RegExp(rule.pattern);
+          compileRegex(rule);
         } catch (err: any) {
-          console.warn(`${ERROR_BANNER} Invalid regex pattern (rule will never match): ${rule.pattern} — ${err.message}`);
+          console.warn(`${ERROR_BANNER} Invalid regex pattern (rule will never match): ${patternString(rule)} — ${err.message}`);
         }
       }
     }
@@ -745,18 +769,18 @@ function findMatch(url: string, method: string): MatchResult | null {
     try {
       if (rule.enabled === false) continue;
       if (!methodMatches(rule)) continue;
-      if (rule.isRegex) {
-        const m = new RegExp(rule.pattern).exec(url);
+      if (isRegexRule(rule)) {
+        const m = compileRegex(rule).exec(url);
         if (m) {
           return {
             rule,
-            match: { start: m.index, end: m.index + m[0].length, pattern: rule.pattern, isRegex: true, kind: 'regex' },
+            match: { start: m.index, end: m.index + m[0].length, pattern: patternString(rule), isRegex: true, kind: 'regex' },
           };
         }
       } else if (url === rule.pattern) {
         return {
           rule,
-          match: { start: 0, end: url.length, pattern: rule.pattern, isRegex: false, kind: 'exact' },
+          match: { start: 0, end: url.length, pattern: patternString(rule), isRegex: false, kind: 'exact' },
         };
       }
     } catch {
@@ -769,12 +793,13 @@ function findMatch(url: string, method: string): MatchResult | null {
     try {
       if (rule.enabled === false) continue;
       if (!methodMatches(rule)) continue;
-      if (!rule.isRegex) {
-        const idx = url.indexOf(rule.pattern);
+      if (!isRegexRule(rule)) {
+        const pat = patternString(rule);
+        const idx = url.indexOf(pat);
         if (idx !== -1) {
           return {
             rule,
-            match: { start: idx, end: idx + rule.pattern.length, pattern: rule.pattern, isRegex: false, kind: 'substring' },
+            match: { start: idx, end: idx + pat.length, pattern: pat, isRegex: false, kind: 'substring' },
           };
         }
       }
@@ -914,7 +939,7 @@ const server = Bun.serve({
         return Response.json({ error: 'Missing ?pattern= parameter' }, { status: 400, headers: corsHeaders });
       }
 
-      const rule = rules.find(r => r.pattern === pattern);
+      const rule = rules.find(r => patternString(r) === pattern);
       if (!rule) {
         return Response.json(
           { error: 'No matching rule for pattern', pattern },
@@ -924,12 +949,13 @@ const server = Bun.serve({
 
       // For pattern-based resolution the "URL" is the pattern itself, so the
       // entire string is the matched range.
+      const ruleIsRegex = isRegexRule(rule);
       const match: MatchInfo = {
         start: 0,
         end: pattern.length,
         pattern,
-        isRegex: rule.isRegex ?? false,
-        kind: rule.isRegex ? 'regex' : 'exact',
+        isRegex: ruleIsRegex,
+        kind: ruleIsRegex ? 'regex' : 'exact',
       };
 
       try {
@@ -997,11 +1023,11 @@ const server = Bun.serve({
     // ── GET /rules — return current rule list ─────────────────────────────
     if (url.pathname === '/rules' && req.method === 'GET') {
       const serialized = rules.map(r => ({
-        pattern: r.pattern,
+        pattern: patternString(r),
         file: r.file || null,
         requestFile: r.requestFile || null,
         forwardRequest: r.forwardRequest || false,
-        isRegex: r.isRegex || false,
+        isRegex: isRegexRule(r),
         method: r.method || '*',
         enabled: r.enabled !== false,
         hasHandler: typeof r.handler === 'function' || typeof r.handler === 'string',
@@ -1048,7 +1074,7 @@ const server = Bun.serve({
       broadcastConfigChange();
 
       return Response.json(
-        { ok: true, index, enabled, pattern: rules[index].pattern },
+        { ok: true, index, enabled, pattern: patternString(rules[index]) },
         { headers: corsHeaders }
       );
     }

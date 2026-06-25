@@ -29,6 +29,27 @@ bun start  # That's it!
 
 ## 📖 Cookbook
 
+Rules live in **`config/rules.ts`** — a TypeScript file that exports an array of
+rule objects. Copy the committed template to create your local copy:
+
+```bash
+cp config/rules.example.ts config/rules.ts
+```
+
+Each snippet below is **one entry in that array**:
+
+```typescript
+// config/rules.ts
+import type { MockRule } from '@server/index.ts';
+
+export default [
+  { pattern: "api.example.com/users", file: "users.json" },
+  // ...more rules
+] satisfies MockRule[];
+```
+
+The server hot-reloads the file every time you save it.
+
 ### Return a static JSON file
 
 ```typescript
@@ -37,8 +58,11 @@ bun start  # That's it!
 
 ### Match URLs with regex
 
+A `string` pattern matches literally; a **`RegExp`** pattern matches as a regex —
+the type is all you need (no `isRegex` flag):
+
 ```typescript
-{ pattern: "/users/\\d+$", file: "user.json", isRegex: true }
+{ pattern: /\/users\/\d+$/, file: "user.json" }
 ```
 
 ### Filter by HTTP method
@@ -133,7 +157,6 @@ bun start  # That's it!
 ```typescript
 {
   pattern: "analytics.example.com",
-  isRegex: true,
   handler: async (req) => {
     console.log("Analytics:", req.url);
     return null;  // Let request pass through
@@ -227,14 +250,14 @@ mocks/                    # Your mock files (gitignored)
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `pattern` | `string` | URL to match (exact, substring, or regex) |
+| `pattern` | `string \| RegExp` | URL to match. **String** = literal (exact or substring); **RegExp** = regex |
 | `file` | `string` | Mock file path, relative to `mocks/` |
 | `handler` | `function` | `(request, responseTemplate?, requestTemplate?) => response` |
 | `requestFile` | `string` | Request template file, relative to `mocks/` |
 | `forwardRequest` | `boolean` | Forward modified request to real server |
-| `isRegex` | `boolean` | Treat `pattern` as regex |
 | `method` | `string` | HTTP method filter (`GET`, `POST`, etc.) |
 | `enabled` | `boolean` | Set `false` to disable |
+| `isRegex` | `boolean` | _Deprecated_ — use a `RegExp` pattern. Treats a string `pattern` as regex |
 
 ---
 
@@ -296,11 +319,14 @@ const handler: HandlerFunction = async (request, responseTemplate, requestTempla
 
 ## Pattern Matching
 
-| Type | Example | Matches |
+| Pattern type | Example | Matches |
 |------|---------|---------|
-| Substring | `"api/users"` | Any URL containing `api/users` |
-| Exact | `"https://api.com/users"` | Exact match only |
-| Regex | `"/users/\\d+"` + `isRegex: true` | `/users/123`, `/users/456` |
+| String (exact) | `"https://api.com/users"` | The exact URL |
+| String (substring) | `"api/users"` | Any URL containing `api/users` |
+| RegExp | `/\/users\/\d+$/` | `…/users/123`, `…/users/456` |
+
+A **string** is tried as an exact match first, then as a substring. A **RegExp**
+literal is always matched as a regular expression.
 
 ---
 

@@ -20,6 +20,7 @@ beforeAll(async () => {
     import type { MockRule } from '${join(process.cwd(), 'server', 'index.ts')}';
     export default [
       { pattern: "api.test/hello", file: "hello.json" },
+      { pattern: /\\/users\\/\\d+$/, file: "hello.json" },
       { pattern: "api.test/only-post", method: "POST", file: "hello.json" },
       {
         pattern: "api.test/dynamic",
@@ -59,7 +60,16 @@ test('GET /health reports rule count', async () => {
   expect(res.status).toBe(200);
   const body = await res.json();
   expect(body.ok).toBe(true);
-  expect(body.rules).toBe(3);
+  expect(body.rules).toBe(4);
+});
+
+test('matches a RegExp pattern', async () => {
+  const hit = await fetch(`${BASE}/resolve?url=${encodeURIComponent('https://api.test/users/42')}`);
+  expect(hit.status).toBe(200);
+  expect(await hit.json()).toEqual({ hello: 'world' });
+  // A non-numeric id should not match /\/users\/\d+$/
+  const miss = await fetch(`${BASE}/resolve?url=${encodeURIComponent('https://api.test/users/abc')}`);
+  expect(miss.status).toBe(404);
 });
 
 test('resolves a static file rule', async () => {

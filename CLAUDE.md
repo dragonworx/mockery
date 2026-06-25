@@ -145,8 +145,7 @@ import type { MockRule } from '../server/index.ts';
 export default [
   {
     pattern: "https://api.example.com/users",
-    file: "users.json",
-    isRegex: false
+    file: "users.json"
   },
   {
     pattern: "https://api.example.com/dynamic",
@@ -172,9 +171,9 @@ export default [
     }),
   },
   {
-    pattern: ".*\\.example\\.com.*address-book.*",
-    file: "api/address-book.json",
-    isRegex: true
+    // A RegExp pattern is matched as a regex (no isRegex flag needed)
+    pattern: /.*\.example\.com.*address-book.*/,
+    file: "api/address-book.json"
   }
 ] satisfies MockRule[];
 ```
@@ -297,9 +296,11 @@ mocks/                  # Stubs/mocks only (gitignored)
 ## Key Implementation Details
 
 ### Pattern Matching
-- String patterns: exact match OR substring match (`url.includes(pattern)`)
-- Regex patterns: tested with `new RegExp(pattern).test(url)`
-- Bad regex patterns are silently skipped
+- The `pattern` field is `string | RegExp`; the type selects the matching mode.
+- String patterns: exact match first, then substring match (`url.includes(pattern)`)
+- RegExp patterns: matched as a regular expression (legacy: a string `pattern` with `isRegex: true` is equivalent)
+- Invalid regex patterns are reported with a warning at config load (the rule then never matches)
+- Over the wire (`/rules`, `/resolve-pattern`) a RegExp is serialized to its source string with `isRegex: true`, so the extension's declarativeNetRequest path is unchanged
 
 ### MIME Type Detection
 Mock server auto-detects content-type for a wide range of file types:
