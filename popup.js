@@ -183,7 +183,7 @@ async function checkServer() {
   } catch {}
 
   serverStatus.className = 'status-dot offline';
-  serverHint.innerHTML = 'Server offline — run <code>npm start</code>';
+  serverHint.innerHTML = 'Server offline — run <code>bun start</code>';
   serverHint.style.color = '#888';
   rulesList.innerHTML = '<div class="empty-state">Cannot reach mock server.</div>';
   ruleCount.textContent = '0';

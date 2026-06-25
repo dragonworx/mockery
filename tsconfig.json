@@ -16,5 +16,5 @@
       "@mocks/*": ["./mocks/*"]
     }
   },
-  "include": ["server/**/*", "config/**/*", "mocks/**/*.ts", "scripts/**/*"]
+  "include": ["server/**/*", "config/**/*", "mocks/**/*.ts", "tests/**/*"]
 }

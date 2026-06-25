@@ -122,10 +122,11 @@ fetch("https://api.example.com/users")
 
 The project separates configuration from mock data:
 
-- `config/` — versioned configuration (committed to git)
-  - `rules.ts` — rule definitions (URL patterns, file mappings, handlers)
-  - `rule-overrides.json` — persisted enable/disable toggle state
-  - `handlers/` — reusable handler function modules
+- `config/` — configuration
+  - `rules.example.ts` — committed reference config; copy to `rules.ts` to start
+  - `rules.ts` — your rule definitions (gitignored, local-only)
+  - `rule-overrides.json` — persisted enable/disable toggle state (gitignored, auto-generated)
+  - `handlers/` — reusable handler function modules (committed)
 - `mocks/` — stub/mock payloads only (gitignored, local-only)
 
 Rules are managed through direct file system manipulation:
@@ -164,7 +165,11 @@ export default [
   {
     pattern: "https://api.example.com/enhanced",
     file: "users.json",
-    handler: (await import('./handlers/modify-response.ts')).default,
+    // Inline handler that augments the loaded file
+    handler: async (request, responseTemplate) => ({
+      ...responseTemplate,
+      body: JSON.stringify({ ...JSON.parse(responseTemplate.body), _enhanced: true }),
+    }),
   },
   {
     pattern: ".*\\.example\\.com.*address-book.*",
@@ -209,30 +214,35 @@ export default [
 
 **Imported Handler Example:**
 ```typescript
-import dynamicHandler from './handlers/dynamic-response.ts';
-import type { MockRule } from '../server/index.ts';
+import forwardExample from '@handlers/forward-example.ts';
+import type { MockRule } from '@server/index.ts';
 
 export default [
   {
-    pattern: "https://api.example.com/dynamic",
-    handler: dynamicHandler
+    pattern: "https://api.example.com/submit",
+    method: "POST",
+    forwardRequest: true,
+    handler: forwardExample
   }
 ] satisfies MockRule[];
 ```
 
-**Handler File Example** (`config/handlers/example.ts`):
+**Handler File Example** (`config/handlers/hello.ts`):
 ```typescript
-import type { HandlerFunction } from '../../server/index.ts';
-import { success } from './utils/common-responses.ts';
+import type { HandlerFunction } from '@server/index.ts';
 
 const handler: HandlerFunction = async (request, responseTemplate, requestTemplate) => {
-  return success({ message: 'Hello', url: request.url });
+  return {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: 'Hello', url: request.url }),
+  };
 };
 
 export default handler;
 ```
 
-**Request Forwarding Example** (`config/handlers/forward-modified.ts`):
+**Request Forwarding Example** (see `config/handlers/forward-example.ts`):
 ```typescript
 import type { HandlerFunction } from '../../server/index.ts';
 
@@ -266,14 +276,12 @@ Relative paths in rules are resolved as follows:
 The `mocks/` folder is for stubs/mocks only and is gitignored. Organize it however you prefer:
 ```
 config/
-├── rules.ts             # Main configuration file (TypeScript module)
-├── rule-overrides.json  # Persisted enable/disable toggle state
-└── handlers/            # TypeScript handler files
-    ├── search-filter.ts
-    ├── dynamic-response.ts
-    ├── modify-response.ts
-    └── utils/
-        └── common-responses.ts
+├── rules.example.ts    # Committed reference config (copy to rules.ts)
+├── rules.ts            # Your local configuration (gitignored)
+├── rule-overrides.json # Persisted enable/disable toggle state (gitignored)
+└── handlers/           # TypeScript handler files
+    ├── forward-example.ts
+    └── validate-request.ts
 
 mocks/                  # Stubs/mocks only (gitignored)
 ├── api/
@@ -411,9 +419,11 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 
 ### Security Considerations
 - Extension only communicates with localhost by default
+- Server binds to `127.0.0.1` only (not exposed on the network)
 - No external network requests unless `forwardRequest` is enabled AND optional permission is granted
 - Mock files are served from local filesystem only
 - HTML escaping in popup UI to prevent XSS
+- Error responses sent to the page omit stack traces by default; set `MOCKERY_DEBUG=1` to include them
 
 ### Debugging
 - MAIN world logs: Open page console, look for `✅` (or `❌` for errors)
@@ -433,10 +443,11 @@ curl -X POST "http://localhost:8756/resolve?url=https://api.example.com/dynamic?
 ├── popup.html/js/css      # Extension popup UI
 ├── server/
 │   └── index.ts           # Bun companion server (TypeScript, zero dependencies!)
-├── config/                # Versioned configuration (committed)
-│   ├── rules.ts           # Rule definitions (TypeScript module)
-│   ├── rule-overrides.json # Persisted enable/disable state
-│   └── handlers/          # TypeScript handler functions
+├── config/                # Configuration
+│   ├── rules.example.ts   # Committed reference config (copy to rules.ts)
+│   ├── rules.ts           # Your rule definitions (gitignored, local-only)
+│   ├── rule-overrides.json # Persisted enable/disable state (gitignored)
+│   └── handlers/          # TypeScript handler functions (committed)
 └── mocks/                 # Mock/stub payloads (gitignored, local-only)
 ```
 

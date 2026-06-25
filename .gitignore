@@ -3,4 +3,7 @@
 _metadata/
 node_modules/
 mocks/
+
+# Local, per-developer config (use config/rules.example.ts as the template)
 config/rules.ts
+config/rule-overrides.json

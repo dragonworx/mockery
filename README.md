@@ -145,22 +145,30 @@ bun start  # That's it!
 
 ## Quick Start
 
-**1. Start the server**
+**1. Create your local config**
+```bash
+cp config/rules.example.ts config/rules.ts
+```
+`config/rules.ts` is gitignored and yours to edit — `rules.example.ts` is the
+committed reference with one example of every rule type. (If you skip this step,
+the server seeds a minimal `config/rules.ts` for you on first run.)
+
+**2. Start the server**
 ```bash
 bun start                        # Port 8756
 bun start 9000                   # Custom port
 bun --watch run server/index.ts  # Auto-restart on changes
 ```
 
-**2. Load the Chrome extension**
+**3. Load the Chrome extension**
 1. Go to `chrome://extensions/`
 2. Enable **Developer mode**
 3. Click **Load unpacked** → select this folder
 4. Toggle on—matched requests now serve your mocks
 
-**3. Add your mocks**
+**4. Add your mocks**
 - Put response files in `mocks/` (gitignored)
-- Edit rules in `config/rules.ts`
+- Edit rules in `config/rules.ts` (gitignored)
 - Changes hot-reload automatically
 
 ---
@@ -200,9 +208,12 @@ bun --watch run server/index.ts  # Auto-restart on changes
 
 ```
 config/
-├── rules.ts              # Your mocking rules
-├── rule-overrides.json   # Enable/disable toggles (auto-generated)
-└── handlers/             # Reusable handler functions
+├── rules.example.ts      # Committed reference — copy to rules.ts to start
+├── rules.ts              # Your mocking rules (gitignored, local)
+├── rule-overrides.json   # Enable/disable toggles (gitignored, auto-generated)
+└── handlers/             # Reusable handler functions (committed)
+    ├── forward-example.ts
+    └── validate-request.ts
 
 mocks/                    # Your mock files (gitignored)
 ├── users.json
@@ -301,6 +312,15 @@ const handler: HandlerFunction = async (request, responseTemplate, requestTempla
 | Server Terminal | Request logs, handler output |
 | Extension Popup | Activity tab, rule toggles |
 | `chrome://extensions/` | Service worker logs |
+
+Run with `MOCKERY_DEBUG=1 bun start` to include full stack traces in error
+responses sent back to the page (off by default; the terminal always logs them).
+
+### Tests
+
+```bash
+bun test   # spins up the server and exercises the core endpoints
+```
 
 ---
 

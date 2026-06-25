@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Mockery",
   "version": "2.0.0",
-  "description": "Intercept HTTP requests and return mock responses from a local Node.js companion server",
+  "description": "Intercept HTTP requests and return mock responses from a local Bun companion server",
   "permissions": [
     "storage",
     "declarativeNetRequest"

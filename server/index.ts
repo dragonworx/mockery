@@ -36,6 +36,11 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 const LOG_BANNER = '✅';
 const ERROR_BANNER = '❌';
 
+// When set (MOCKERY_DEBUG=1), error responses sent back to the page include
+// stack traces. Off by default so internal code paths aren't leaked to mocked
+// pages — the server terminal always logs the full stack regardless.
+const DEBUG = process.env.MOCKERY_DEBUG === '1' || process.env.MOCKERY_DEBUG === 'true';
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface MockRule {
@@ -201,11 +206,13 @@ function applyOverrides(): void {
 // ── Config loading + hot-reload ─────────────────────────────────────────────
 let rules: MockRule[] = [];
 
-// Starter template written on first run when rules.ts is missing. The file is
-// gitignored and user-owned, so we only seed it when it doesn't exist.
-const STARTER_RULES_TS = `// Mockery Configuration
+// Starter template written on first run when rules.ts is missing, so a fresh
+// checkout (or a custom --config path) always has a valid config to load.
+// For a fuller set of examples, copy config/rules.example.ts to config/rules.ts.
+const STARTER_RULES_TS = `// Mockery Configuration (local — gitignored)
 // This file defines URL patterns and their corresponding mock responses.
-// It is gitignored — edit freely for your local setup.
+// Edit freely — the server hot-reloads it on save.
+// See config/rules.example.ts for one example of every rule type.
 
 import type { MockRule } from '../server/index.ts';
 
@@ -243,6 +250,18 @@ async function loadConfig(): Promise<void> {
     rules = loadedRules;
     applyOverrides();
     console.log(`${LOG_BANNER} Loaded ${rules.length} rule(s) from ${configPath}`);
+
+    // Validate regex patterns once, up front, so a typo surfaces as a clear
+    // warning instead of silently never matching at request time.
+    for (const rule of rules) {
+      if (rule.isRegex) {
+        try {
+          new RegExp(rule.pattern);
+        } catch (err: any) {
+          console.warn(`${ERROR_BANNER} Invalid regex pattern (rule will never match): ${rule.pattern} — ${err.message}`);
+        }
+      }
+    }
   } catch (err: any) {
     if (err.code === 'ENOENT' || err.code === 'ERR_MODULE_NOT_FOUND') {
       console.warn(`${LOG_BANNER} Config not found: ${configPath} — starting with 0 rules`);
@@ -578,7 +597,7 @@ async function resolveWithHandler(
               handler: handlerName,
               detail: err.message,
               name: err.name,
-              stack: err.stack,
+              ...(DEBUG ? { stack: err.stack } : {}),
             })
           }
         };
@@ -882,7 +901,7 @@ const server = Bun.serve({
       } catch (error: any) {
         console.error(`${ERROR_BANNER} Request processing error:`, error);
         return Response.json(
-          { error: 'Internal server error', name: error.name, detail: error.message, stack: error.stack },
+          { error: 'Internal server error', name: error.name, detail: error.message, ...(DEBUG ? { stack: error.stack } : {}) },
           { status: 500, headers: corsHeaders }
         );
       }
@@ -942,7 +961,7 @@ const server = Bun.serve({
       } catch (error: any) {
         console.error(`${ERROR_BANNER} Request processing error:`, error);
         return Response.json(
-          { error: 'Internal server error', name: error.name, detail: error.message, stack: error.stack },
+          { error: 'Internal server error', name: error.name, detail: error.message, ...(DEBUG ? { stack: error.stack } : {}) },
           { status: 500, headers: corsHeaders }
         );
       }
