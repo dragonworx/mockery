@@ -27,16 +27,23 @@ bun start  # That's it!
 
 ---
 
-## 📖 Cookbook
+## How Configuration Works
 
-Rules live in **`config/rules.ts`** — a TypeScript file that exports an array of
-rule objects. Copy the committed template to create your local copy:
+Spend a minute on the mental model here and every Cookbook recipe will read like
+plain English.
+
+### Where config lives
+
+All mocking is driven by **`config/rules.ts`** — a TypeScript file that exports
+an array of rules. Copy the committed template to create your local copy:
 
 ```bash
 cp config/rules.example.ts config/rules.ts
 ```
 
-Each snippet below is **one entry in that array**:
+`rules.ts` is gitignored (it's yours to edit); `rules.example.ts` is the
+committed reference. The server **hot-reloads** the file every time you save —
+no restart needed.
 
 ```typescript
 // config/rules.ts
@@ -48,7 +55,116 @@ export default [
 ] satisfies MockRule[];
 ```
 
-The server hot-reloads the file every time you save it.
+### A rule = "match a URL → decide what comes back"
+
+Every rule has a **`pattern`** (which URLs it matches) and an instruction for
+what to do on a match. Mockery sits between the page and the network:
+
+```
+page  ──request──▶  Mockery  ──┬─▶  mock response   (default — real server is never hit)
+                                └─▶  real server     (only when forwardRequest: true)
+```
+
+There are two halves of the exchange you can touch — the **request** (page →
+server) and the **response** (server → page) — and three things you can do:
+
+| Goal | How | Real server hit? |
+|------|-----|------------------|
+| Serve canned data | `file` (a fixture in `mocks/`) | No |
+| Build or edit the response | `handler` (optionally starting from `file`) | No |
+| Modify the real request/response | `forwardRequest: true` + `handler` returning `{ request }` | Yes |
+
+### 1. Serve mock data (response only)
+
+Point a pattern at a file. The page receives that file as the response; the real
+API is never contacted.
+
+```typescript
+{ pattern: "api.example.com/users", file: "users.json" }
+```
+
+### 2. Generate or modify the response with a handler
+
+A `handler` builds the response in code. Add a `file` and it's loaded for you as
+the **`responseTemplate`** — so you can start from your mock data and tweak it.
+The handler also receives the live **`request`**, so responses can react to what
+the page actually sent.
+
+```typescript
+{
+  pattern: "api.example.com/users",
+  file: "users.json",                      // loaded as responseTemplate
+  handler: async (request, responseTemplate) => ({
+    ...responseTemplate,                    // keep the mock data...
+    body: JSON.stringify({                  // ...but modify it
+      ...JSON.parse(responseTemplate.body),
+      _injectedAt: Date.now(),
+    }),
+  }),
+}
+```
+
+### 3. Modify the original request and forward it
+
+Sometimes you don't want a mock at all — you want the **real** response, but with
+a tweaked request on the way out. Set `forwardRequest: true` and return a
+`{ request }` object. (Return `null` instead to observe without changing
+anything.)
+
+```typescript
+{
+  pattern: "api.example.com/submit",
+  forwardRequest: true,                    // let it reach the real server
+  handler: async (request) => ({
+    request: {                             // rewrite the outgoing request
+      ...request,
+      headers: { ...request.headers, "X-Debug": "true" },
+    },
+    // no `response` ⇒ the real server's response is returned to the page
+  }),
+}
+```
+
+### Mock data vs. the original
+
+- **Working with mock data** → use `file` (a response fixture) and `requestFile`
+  (a request fixture), both loaded from `mocks/`. Ideal for deterministic,
+  offline responses and for comparing or replacing request bodies.
+- **Working with the original** → read the live `request` in your handler and,
+  with `forwardRequest`, the real response — then transform either one.
+
+The handler signature ties it together:
+
+```typescript
+(request, responseTemplate, requestTemplate) => response | { request, response? } | null
+//  ▲ live       ▲ from `file`     ▲ from `requestFile`
+```
+
+| Return value | Effect |
+|--------------|--------|
+| `{ status, headers, body }` | Page gets this response (no real call) |
+| `{ request }` (+ `forwardRequest`) | Forward the modified request; return the real response |
+| `{ request, response }` | Forward, then apply your response transform |
+| `null` | Don't mock — let the request pass through untouched |
+
+### Rule options
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pattern` | `string \| RegExp` | URL to match. **String** = literal (exact or substring); **RegExp** = regex |
+| `file` | `string` | Response fixture, relative to `mocks/` (also passed to the handler as `responseTemplate`) |
+| `handler` | `function` | `(request, responseTemplate?, requestTemplate?) => response \| { request } \| null` |
+| `requestFile` | `string` | Request fixture, relative to `mocks/` (passed as `requestTemplate`) |
+| `forwardRequest` | `boolean` | Send the (modified) request to the real server |
+| `method` | `string` | HTTP method filter (`GET`, `POST`, …) |
+| `enabled` | `boolean` | Set `false` to disable without deleting |
+| `isRegex` | `boolean` | _Deprecated_ — use a `RegExp` pattern. Treats a string `pattern` as regex |
+
+---
+
+## 📖 Cookbook
+
+Each snippet below is **one entry in the `config/rules.ts` array**.
 
 ### Return a static JSON file
 
@@ -227,7 +343,7 @@ bun --watch run server/index.ts  # Auto-restart on changes
 
 ---
 
-## Configuration
+## Project Layout
 
 ```
 config/
@@ -246,18 +362,8 @@ mocks/                    # Your mock files (gitignored)
     └── expected-payload.json
 ```
 
-### Rule Options
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `pattern` | `string \| RegExp` | URL to match. **String** = literal (exact or substring); **RegExp** = regex |
-| `file` | `string` | Mock file path, relative to `mocks/` |
-| `handler` | `function` | `(request, responseTemplate?, requestTemplate?) => response` |
-| `requestFile` | `string` | Request template file, relative to `mocks/` |
-| `forwardRequest` | `boolean` | Forward modified request to real server |
-| `method` | `string` | HTTP method filter (`GET`, `POST`, etc.) |
-| `enabled` | `boolean` | Set `false` to disable |
-| `isRegex` | `boolean` | _Deprecated_ — use a `RegExp` pattern. Treats a string `pattern` as regex |
+See [How Configuration Works](#how-configuration-works) for the full field
+reference and the request/response model.
 
 ---
 
