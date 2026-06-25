@@ -1083,7 +1083,7 @@ const server = Bun.serve({
   }
 });
 
-console.log(`${LOG_BANNER} Listening on http://localhost:${server.port}`);
+console.log(`${LOG_BANNER} Listening on http://127.0.0.1:${server.port}`);
 console.log(`${LOG_BANNER} Config: ${configPath}`);
 console.log(`${LOG_BANNER} Endpoints:`);
 console.log(`  GET /resolve?url=<encoded>       — serve a matched mock`);

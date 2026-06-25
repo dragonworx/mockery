@@ -66,7 +66,7 @@ async function pushRules() {
   else if (enableLogging === false) resolvedLevel = 'silent';
   else resolvedLevel = 'info';
   currentLogLevel = resolvedLevel;
-  const base = serverUrl || 'http://localhost:8756';
+  const base = serverUrl || 'http://127.0.0.1:8756';
   let rules = [];
 
   if (enabled !== false) {

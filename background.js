@@ -1,11 +1,14 @@
 /**
  * Background Service Worker for Mockery
  * Bridges RESOLVE_MOCK messages from the content script to the local Node
- * companion server (http://localhost:8756 by default).
+ * companion server (http://127.0.0.1:8756 by default).
  * Also manages declarativeNetRequest rules for HTML resource interception.
  */
 
-const DEFAULT_SERVER = 'http://localhost:8756';
+// Use 127.0.0.1 (not "localhost"): the server binds IPv4 loopback only, and on
+// many systems "localhost" resolves to IPv6 ::1 first, which the server isn't
+// listening on — fetch() would then fail with "Failed to fetch".
+const DEFAULT_SERVER = 'http://127.0.0.1:8756';
 
 // ── Log banners ──────────────────────────────────────────────────
 const LOG_BANNER = '✅';
@@ -78,8 +81,17 @@ async function updateDeclarativeRules() {
 
     const base = serverUrl || DEFAULT_SERVER;
 
-    // Fetch rules from Node server
-    const resp = await fetch(`${base}/rules`);
+    // Fetch rules from the mock server. If it isn't running yet, that's a normal,
+    // transient condition (you load the extension once; the server starts/stops
+    // independently) — so degrade to a friendly notice instead of an error.
+    // The SSE reconnect handler re-runs this once the server becomes reachable.
+    let resp;
+    try {
+      resp = await fetch(`${base}/rules`);
+    } catch {
+      log('info', `Mock server not reachable at ${base} — start it with \`bun start\`. Resource rules will load once it's running.`);
+      return;
+    }
     if (!resp.ok) {
       log('warn', 'Could not fetch rules for declarativeNetRequest:', resp.status);
       return;
@@ -193,6 +205,10 @@ function connectSSE() {
       .then(response => {
         // Connected successfully — reset backoff
         sseRetryDelay = 1000;
+
+        // The server is now reachable. Refresh declarativeNetRequest rules in
+        // case it came up after the extension loaded (self-heal).
+        updateDeclarativeRules();
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();

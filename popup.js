@@ -24,7 +24,7 @@ const grantForwardPermission = document.getElementById('grantForwardPermission')
 const LOG_LEVELS = new Set(['silent', 'error', 'warn', 'info', 'debug']);
 const DEFAULT_LOG_LEVEL = 'info';
 
-const DEFAULT_SERVER = 'http://localhost:8756';
+const DEFAULT_SERVER = 'http://127.0.0.1:8756';
 const DEFAULT_TOAST_DURATION = 10;
 
 // ── Init ────────────────────────────────────────────────────────────────────

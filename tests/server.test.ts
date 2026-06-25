@@ -7,7 +7,7 @@ import { tmpdir } from 'os';
 // endpoints. Zero dependencies — uses Bun's built-in test runner + Bun.spawn.
 
 const PORT = 18756;
-const BASE = `http://localhost:${PORT}`;
+const BASE = `http://127.0.0.1:${PORT}`;
 
 let proc: ReturnType<typeof Bun.spawn>;
 let tmp: string;
