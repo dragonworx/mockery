@@ -51,6 +51,8 @@ export interface MockRule {
    * The type decides the matching mode — no flag needed.
    */
   pattern: string | RegExp;
+  /** Optional human-friendly name for the rule, shown on the page toast and in logs. */
+  name?: string;
   file?: string;
   requestFile?: string;        // Load request template from mocks/ folder
   forwardRequest?: boolean;    // Forward (modified) request to real server
@@ -122,6 +124,8 @@ export interface MatchInfo {
   pattern: string;
   isRegex: boolean;
   kind: 'exact' | 'regex' | 'substring';
+  /** Optional rule name, carried through to the page toast. */
+  name?: string;
 }
 
 interface CachedHandler {
@@ -774,13 +778,13 @@ function findMatch(url: string, method: string): MatchResult | null {
         if (m) {
           return {
             rule,
-            match: { start: m.index, end: m.index + m[0].length, pattern: patternString(rule), isRegex: true, kind: 'regex' },
+            match: { start: m.index, end: m.index + m[0].length, pattern: patternString(rule), isRegex: true, kind: 'regex', name: rule.name },
           };
         }
       } else if (url === rule.pattern) {
         return {
           rule,
-          match: { start: 0, end: url.length, pattern: patternString(rule), isRegex: false, kind: 'exact' },
+          match: { start: 0, end: url.length, pattern: patternString(rule), isRegex: false, kind: 'exact', name: rule.name },
         };
       }
     } catch {
@@ -799,7 +803,7 @@ function findMatch(url: string, method: string): MatchResult | null {
         if (idx !== -1) {
           return {
             rule,
-            match: { start: idx, end: idx + pat.length, pattern: pat, isRegex: false, kind: 'substring' },
+            match: { start: idx, end: idx + pat.length, pattern: pat, isRegex: false, kind: 'substring', name: rule.name },
           };
         }
       }
@@ -836,7 +840,8 @@ function logMockServed(method: string, url: string, rule: MockRule, match: Match
   const target = rule.handler
     ? `${typeof rule.handler === 'function' ? 'inline function' : rule.handler} (handler)`
     : rule.file ?? '(no body)';
-  console.log(`${LOG_BANNER} ${method} ${ansiHighlightUrl(url, match)} → ${target}`);
+  const namePart = rule.name ? `${ANSI_HIGHLIGHT}[${rule.name}]${ANSI_RESET} ` : '';
+  console.log(`${LOG_BANNER} ${namePart}${method} ${ansiHighlightUrl(url, match)} → ${target}`);
 }
 
 // ── HTTP server (Bun.serve) ─────────────────────────────────────────────────
@@ -1024,6 +1029,7 @@ const server = Bun.serve({
     if (url.pathname === '/rules' && req.method === 'GET') {
       const serialized = rules.map(r => ({
         pattern: patternString(r),
+        name: r.name || null,
         file: r.file || null,
         requestFile: r.requestFile || null,
         forwardRequest: r.forwardRequest || false,

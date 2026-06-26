@@ -600,9 +600,17 @@ function showToast(url, file, type = 'success', errorInfoOrMessage = null, encod
     const closeBtn = hasHandlerLogs
       ? `<button type="button" data-mockery-close style="position:absolute;top:6px;right:8px;background:transparent;border:none;color:${mutedColor};font-size:16px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:3px;" title="Dismiss">×</button>`
       : '';
+    // Optional rule name pill, shown above the URL when the matched rule has a `name`.
+    const nameHtml = (match && match.name)
+      ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;${hasHandlerLogs ? 'padding-right:18px;' : ''}">
+          <span style="font-size:10px;font-weight:700;letter-spacing:0.5px;color:${accentColor};">MOCKED</span>
+          <span style="font-size:12px;font-weight:600;color:${textColor};">${escapeHtml(match.name)}</span>
+        </div>`
+      : '';
     toast.innerHTML = `
       ${closeBtn}
-      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;${hasHandlerLogs ? 'padding-right:18px;' : ''}">
+      ${nameHtml}
+      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;${(hasHandlerLogs && !nameHtml) ? 'padding-right:18px;' : ''}">
         ${match && match.start < originLen ? originHtml : ''}${pathHtml}
       </div>
       ${logsHtml}

@@ -65,6 +65,16 @@ page  ──request──▶  Mockery  ──┬─▶  mock response   (default
                                 └─▶  real server     (only when forwardRequest: true)
 ```
 
+> [!IMPORTANT]
+> **Mocked requests do _not_ appear in the browser's Network panel.** Mockery
+> intercepts `fetch`/`XHR` inside the page _before_ they reach the network layer
+> and returns the mock from memory, so DevTools never records a network entry for
+> them. This is expected — it is not a bug. If you need to see a request in the
+> Network panel, it must actually leave the browser: use **`forwardRequest: true`**
+> so the (optionally modified) request is sent to the real server. To confirm a
+> mock _is_ being served, watch the on-page **toast**, the extension's **Activity**
+> tab, or the server console instead of the Network panel.
+
 There are two halves of the exchange you can touch — the **request** (page →
 server) and the **response** (server → page) — and three things you can do:
 
@@ -152,6 +162,7 @@ The handler signature ties it together:
 | Field | Type | Description |
 |-------|------|-------------|
 | `pattern` | `string \| RegExp` | URL to match. **String** = literal (exact or substring); **RegExp** = regex |
+| `name` | `string` | Optional label shown on the on-page toast and in the server log |
 | `file` | `string` | Response fixture, relative to `mocks/` (also passed to the handler as `responseTemplate`) |
 | `handler` | `function` | `(request, responseTemplate?, requestTemplate?) => response \| { request } \| null` |
 | `requestFile` | `string` | Request fixture, relative to `mocks/` (passed as `requestTemplate`) |

@@ -12,6 +12,7 @@
 // Quick reference (see README.md "Cookbook" for the full list):
 //   pattern        URL to match. A string matches literally (exact URL or a
 //                  substring of it); a RegExp (e.g. /\/users\/\d+$/) is a regex.
+//   name           optional label shown on the page toast and in server logs
 //   file           mock file to serve, relative to mocks/
 //   handler        function to generate/modify a response (inline or imported)
 //   method         restrict to an HTTP method (GET, POST, …)
@@ -21,8 +22,9 @@
 import type { MockRule } from '@server/index.ts';
 
 export default [
-  // ── Serve a static JSON file ────────────────────────────────────────────────
+  // ── Serve a static JSON file (with an optional friendly name) ───────────────
   {
+    name: "User list",
     pattern: "api.example.com/users",
     file: "users.json", // → mocks/users.json
   },
