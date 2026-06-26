@@ -600,11 +600,11 @@ function showToast(url, file, type = 'success', errorInfoOrMessage = null, encod
     const closeBtn = hasHandlerLogs
       ? `<button type="button" data-mockery-close style="position:absolute;top:6px;right:8px;background:transparent;border:none;color:${mutedColor};font-size:16px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:3px;" title="Dismiss">×</button>`
       : '';
-    // Optional rule name pill, shown above the URL when the matched rule has a `name`.
+    // Optional rule name, shown as a small title above the URL when the matched rule has a `name`.
     const nameHtml = (match && match.name)
-      ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;${hasHandlerLogs ? 'padding-right:18px;' : ''}">
-          <span style="font-size:10px;font-weight:700;letter-spacing:0.5px;color:${accentColor};">MOCKED</span>
-          <span style="font-size:12px;font-weight:600;color:${textColor};">${escapeHtml(match.name)}</span>
+      ? `<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;padding-bottom:6px;border-bottom:1px solid ${borderColor};${hasHandlerLogs ? 'padding-right:18px;' : ''}">
+          <span style="flex:none;font-size:9px;font-weight:700;letter-spacing:0.6px;color:#fff;background:${accentColor};padding:2px 6px;border-radius:3px;">MOCKED</span>
+          <span style="font-size:13px;font-weight:700;color:${textColor};">${escapeHtml(match.name)}</span>
         </div>`
       : '';
     toast.innerHTML = `
